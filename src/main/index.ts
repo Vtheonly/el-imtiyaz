@@ -12,6 +12,11 @@
  */
 
 import { app, BrowserWindow } from 'electron';
+import { loadEnv } from './system/env-loader';
+
+// Load environmental variables from .env
+loadEnv();
+
 import { registerIpcHandlers } from './ipc';
 import { WindowManager } from './window-manager';
 import { BootstrapPipeline } from './bootstrap';

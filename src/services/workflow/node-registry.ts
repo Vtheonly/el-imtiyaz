@@ -246,28 +246,6 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     }
   },
   {
-    id: 'action.send.sms',
-    type: 'action',
-    label: 'Send SMS',
-    description: 'Sends an SMS notification',
-    icon: 'MessageSquare',
-    category: 'Actions',
-    inputs: [anyIn()],
-    outputs: [anyOut()],
-    configSchema: [
-      { key: 'to', label: 'To (phone)', type: 'text', required: true, placeholder: '+213…' },
-      { key: 'message', label: 'Message', type: 'textarea', required: true }
-    ],
-    execute: async (ctx) => {
-      const to = String(ctx.config.to ?? '');
-      const message = String(ctx.config.message ?? '');
-      if (!to) return { outputs: {}, error: 'Missing "to" phone' };
-      await ctx.services.sendSms(to, message);
-      ctx.logger('info', 'action.send.sms.sent', { to });
-      return { outputs: { sent: true, to } };
-    }
-  },
-  {
     id: 'action.apply.discount',
     type: 'action',
     label: 'Apply Discount',

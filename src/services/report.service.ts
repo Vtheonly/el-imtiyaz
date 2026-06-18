@@ -48,8 +48,8 @@ export class ReportService {
     private readonly attendance: AttendanceRepository
   ) {}
 
-  async revenue(rangeInput?: { start: string; end: string }): Promise<RevenueReport> {
-    const range = rangeInput
+  async revenue(rangeInput?: { start?: string; end?: string }): Promise<RevenueReport> {
+    const range = rangeInput?.start && rangeInput?.end
       ? new DateRange(rangeInput.start, rangeInput.end)
       : DateRange.thisMonth();
 
@@ -98,7 +98,7 @@ export class ReportService {
     const totalRow = this.invoices.raw.prepare(
       `SELECT COALESCE(SUM(amount_due - discount_amount - amount_paid), 0) as total
        FROM invoices WHERE deleted_at IS NULL`
-    ).get(undefined as any) as { total: number };
+    ).get() as { total: number };
 
     const classRows = this.invoices.raw.prepare(
       `SELECT s.class_id, c.name as class_name,
@@ -111,7 +111,7 @@ export class ReportService {
        GROUP BY s.class_id
        HAVING outstanding > 0
        ORDER BY outstanding DESC`
-    ).all(undefined as any) as Array<{ class_id: string; class_name: string; outstanding: number; student_count: number }>;
+    ).all() as Array<{ class_id: string; class_name: string; outstanding: number; student_count: number }>;
 
     return {
       totalOutstanding: totalRow.total,

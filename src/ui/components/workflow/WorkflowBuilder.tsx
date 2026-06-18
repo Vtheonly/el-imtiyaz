@@ -109,7 +109,7 @@ export function WorkflowBuilder({
     if (idx === -1) return null;
     return {
       x: node.position.x + (portType === 'input' ? 0 : NODE_WIDTH),
-      y: node.position.y + 28 + (idx + 0.5) * 18
+      y: node.position.y + 32 + 4 + (idx + 0.5) * 20
     };
   };
 
@@ -508,44 +508,73 @@ export function WorkflowBuilder({
                   {/* Header */}
                   <div
                     style={{
-                      padding: '8px 12px',
+                      height: 32,
+                      padding: '0 12px',
                       borderBottom: '1px solid var(--border-default)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
                       background: `${color}22`,
-                      borderRadius: 'var(--radius-md) var(--radius-md) 0 0'
+                      borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
+                      boxSizing: 'border-box'
                     }}
                   >
-                    <Icon size={14} style={{ color }} />
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>
+                    <Icon size={14} style={{ color, flexShrink: 0 }} />
+                    <span style={{
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: 'var(--weight-semibold)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      flex: 1
+                    }}>
                       {node.label}
                     </span>
                   </div>
                   {/* Ports */}
-                  <div style={{ padding: '6px 12px', position: 'relative' }}>
-                    {node.inputs.map((port) => (
-                      <Port
-                        key={port.id}
-                        label={port.label}
-                        portId={port.id}
-                        nodeId={node.id}
-                        side="left"
-                        color={color}
-                        onMouseDown={(e) => handlePortMouseDown(e, node.id, port.id, 'input')}
-                      />
-                    ))}
-                    {node.outputs.map((port) => (
-                      <Port
-                        key={port.id}
-                        label={port.label}
-                        portId={port.id}
-                        nodeId={node.id}
-                        side="right"
-                        color={color}
-                        onMouseDown={(e) => handlePortMouseDown(e, node.id, port.id, 'output')}
-                      />
-                    ))}
+                  <div style={{ padding: '4px 12px', position: 'relative', boxSizing: 'border-box' }}>
+                    {Array.from({ length: Math.max(node.inputs.length, node.outputs.length) }).map((_, idx) => {
+                      const input = node.inputs[idx];
+                      const output = node.outputs[idx];
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            height: 20,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            position: 'relative',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+                            {input && (
+                              <Port
+                                label={input.label}
+                                portId={input.id}
+                                nodeId={node.id}
+                                side="left"
+                                color={color}
+                                onMouseDown={(e) => handlePortMouseDown(e, node.id, input.id, 'input')}
+                              />
+                            )}
+                          </div>
+                          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                            {output && (
+                              <Port
+                                label={output.label}
+                                portId={output.id}
+                                nodeId={node.id}
+                                side="right"
+                                color={color}
+                                onMouseDown={(e) => handlePortMouseDown(e, node.id, output.id, 'output')}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                     {node.inputs.length === 0 && node.outputs.length === 0 && (
                       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', padding: '4px 0' }}>
                         No ports
@@ -657,9 +686,11 @@ function Port({
         justifyContent: side === 'left' ? 'flex-start' : 'flex-end',
         alignItems: 'center',
         gap: 6,
-        padding: '3px 0',
+        padding: 0,
         fontSize: 'var(--text-xs)',
-        color: 'var(--color-text-secondary)'
+        color: 'var(--color-text-secondary)',
+        width: '100%',
+        boxSizing: 'border-box'
       }}
     >
       {side === 'left' && (
@@ -671,6 +702,8 @@ function Port({
             style={{
               position: 'absolute',
               left: -PORT_RADIUS - 2,
+              top: '50%',
+              transform: 'translateY(-50%)',
               width: PORT_RADIUS * 2,
               height: PORT_RADIUS * 2,
               borderRadius: '50%',
@@ -680,12 +713,16 @@ function Port({
               boxShadow: `0 0 6px ${color}88`
             }}
           />
-          {label}
+          <span style={{ paddingLeft: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {label}
+          </span>
         </>
       )}
       {side === 'right' && (
         <>
-          {label}
+          <span style={{ paddingRight: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {label}
+          </span>
           <div
             data-port={portId}
             data-node-id={nodeId}
@@ -693,6 +730,8 @@ function Port({
             style={{
               position: 'absolute',
               right: -PORT_RADIUS - 2,
+              top: '50%',
+              transform: 'translateY(-50%)',
               width: PORT_RADIUS * 2,
               height: PORT_RADIUS * 2,
               borderRadius: '50%',

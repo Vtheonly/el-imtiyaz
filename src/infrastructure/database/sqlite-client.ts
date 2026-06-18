@@ -91,30 +91,36 @@ export class DatabaseClient {
   all<T = Record<string, unknown>>(sql: string, params: SqlParameters = {}): T[] {
     const stmt = this.prepare<any>(sql);
     if (typeof params === 'object' && !Array.isArray(params)) {
-      return stmt.all(params as Record<string, unknown>) as T[];
+      return Object.keys(params).length === 0
+        ? stmt.all() as T[]
+        : stmt.all(params as Record<string, unknown>) as T[];
     }
     const arr = params as unknown[];
-    return (arr.length === 0 ? stmt.all(undefined) : (stmt.all as any)(...arr)) as T[];
+    return (arr.length === 0 ? stmt.all() : (stmt.all as any)(...arr)) as T[];
   }
 
   /** Runs a parameterised query that returns a single row (or undefined). */
   get<T = Record<string, unknown>>(sql: string, params: SqlParameters = {}): T | undefined {
     const stmt = this.prepare<any>(sql);
     if (typeof params === 'object' && !Array.isArray(params)) {
-      return stmt.get(params as Record<string, unknown>) as T | undefined;
+      return Object.keys(params).length === 0
+        ? stmt.get() as T | undefined
+        : stmt.get(params as Record<string, unknown>) as T | undefined;
     }
     const arr = params as unknown[];
-    return (arr.length === 0 ? stmt.get(undefined) : (stmt.get as any)(...arr)) as T | undefined;
+    return (arr.length === 0 ? stmt.get() : (stmt.get as any)(...arr)) as T | undefined;
   }
 
   /** Runs an INSERT/UPDATE/DELETE. Returns the number of affected rows. */
   run(sql: string, params: SqlParameters = {}): { changes: number; lastInsertRowid: number | bigint } {
     const stmt = this.prepare(sql);
     if (typeof params === 'object' && !Array.isArray(params)) {
-      return stmt.run(params as Record<string, unknown>);
+      return Object.keys(params).length === 0
+        ? stmt.run()
+        : stmt.run(params as Record<string, unknown>);
     }
     const arr = params as unknown[];
-    return arr.length === 0 ? stmt.run(undefined) : (stmt.run as any)(...arr);
+    return arr.length === 0 ? stmt.run() : (stmt.run as any)(...arr);
   }
 
   /**

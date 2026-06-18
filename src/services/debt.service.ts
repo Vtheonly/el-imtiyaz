@@ -52,7 +52,7 @@ export class DebtService {
     const outstandingRow = this.invoices.raw.prepare(
       `SELECT COALESCE(SUM(amount_due - discount_amount - amount_paid), 0) as total
        FROM invoices WHERE deleted_at IS NULL AND status NOT IN ('cancelled', 'refunded')`
-    ).get(undefined as any) as { total: number };
+    ).get() as { total: number };
 
     const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
@@ -70,21 +70,21 @@ export class DebtService {
     const debtorsRow = this.invoices.raw.prepare(
       `SELECT COUNT(DISTINCT student_id) as count FROM invoices
        WHERE deleted_at IS NULL AND (amount_due - discount_amount - amount_paid) > 0`
-    ).get(undefined as any) as { count: number };
+    ).get() as { count: number };
 
     const overdueRow = this.invoices.raw.prepare(
       `SELECT COUNT(*) as count FROM invoices
        WHERE deleted_at IS NULL
          AND due_date < date('now')
          AND (amount_due - discount_amount - amount_paid) > 0`
-    ).get(undefined as any) as { count: number };
+    ).get() as { count: number };
 
     // Largest debtor
     const largestDebtorRow = this.invoices.raw.prepare(
       `SELECT student_id, SUM(amount_due - discount_amount - amount_paid) as debt
        FROM invoices WHERE deleted_at IS NULL
        GROUP BY student_id ORDER BY debt DESC LIMIT 1`
-    ).get(undefined as any) as { student_id: string; debt: number } | undefined;
+    ).get() as { student_id: string; debt: number } | undefined;
 
     let largestDebtor: SchoolDebtSummary['largestDebtor'] | undefined;
     if (largestDebtorRow && largestDebtorRow.student_id) {
@@ -164,7 +164,7 @@ export class DebtService {
          AND i.due_date < date('now')
          AND (i.amount_due - i.discount_amount - i.amount_paid) > 0
        ORDER BY days_overdue DESC`
-    ).all(undefined as any) as Array<{
+    ).all() as Array<{
       invoice_id: string;
       student_id: string;
       student_name: string;

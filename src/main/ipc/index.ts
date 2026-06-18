@@ -14,6 +14,7 @@
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { IPC } from './channels';
 import { logger } from '../../infrastructure/logger/logger';
+import { sendEmailWithResend } from '../../infrastructure/email/resend';
 import { AppError, toAppError } from '../../infrastructure/error/app-error';
 import { DatabaseClient } from '../../infrastructure/database/sqlite-client';
 import { EventBus } from '../../infrastructure/event-bus/event-bus';
@@ -99,8 +100,10 @@ export function registerIpcHandlers(deps: RegistryDependencies): void {
       return { outstanding: Math.max(0, owed - paid) };
     },
     sendEmail: async (_to: string, _subject: string, _body: string) => {
-      // Stubbed for v1 — real SMTP integration is a config-time decision
-      logger.info('workflow.node.send_email.stub', { to: _to, subject: _subject });
+      const res = await sendEmailWithResend({ to: _to, subject: _subject, body: _body });
+      if (!res.success) {
+        throw new Error(`Resend email sending failed: ${res.error}`);
+      }
     },
     sendSms: async (_to: string, _message: string) => {
       logger.info('workflow.node.send_sms.stub', { to: _to });

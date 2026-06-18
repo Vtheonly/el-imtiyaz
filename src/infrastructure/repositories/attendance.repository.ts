@@ -54,7 +54,8 @@ export class AttendanceRepository extends BaseRepository<Attendance, AttendanceQ
     if (query.status) { conditions.push('status = @status'); params.status = query.status; }
 
     const rows = this.db.all<AttendanceRow>(
-      `SELECT * FROM attendance WHERE ${conditions.join(' AND ')} ORDER BY date DESC, created_at DESC`
+      `SELECT * FROM attendance WHERE ${conditions.join(' AND ')} ORDER BY date DESC, created_at DESC`,
+      params
     );
     return rows.map((r) => this.mapRow(r));
   }
