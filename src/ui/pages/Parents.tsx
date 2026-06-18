@@ -7,6 +7,7 @@ import { Plus, Search, Users } from 'lucide-react';
 import { Card, Button, EmptyState, Badge } from '../components/common';
 import { PageHeader } from '../components/common/PageHeader';
 import { DataGrid, Column } from '../components/data/DataGrid';
+import { NewParentModal } from '../components/forms/NewParentModal';
 
 interface ParentRow {
   id: string;
@@ -21,23 +22,27 @@ export function Parents() {
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showNewModal, setShowNewModal] = useState(false);
+
+  const loadParents = async () => {
+    setLoading(true);
+    try {
+      const rows = await window.elImtiyaz.parents.list({ search: search || undefined, pageSize: 200 });
+      setParents((rows as any[]).map((p) => ({
+        id: p.id.value,
+        fullName: p.fullName,
+        phone: p.phone,
+        email: p.email,
+        relationship: p.relationship,
+        studentIds: p.studentIds
+      })));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const rows = await window.elImtiyaz.parents.list({ search: search || undefined, pageSize: 200 });
-        setParents((rows as any[]).map((p) => ({
-          id: p.id.value,
-          fullName: p.fullName,
-          phone: p.phone,
-          email: p.email,
-          relationship: p.relationship,
-          studentIds: p.studentIds
-        })));
-      } finally {
-        setLoading(false);
-      }
-    })();
+    loadParents();
   }, [search]);
 
   const columns: Column<ParentRow>[] = [
@@ -76,7 +81,7 @@ export function Parents() {
       <PageHeader
         title="Parents"
         subtitle={`${parents.length} parents`}
-        actions={<Button variant="primary" icon={<Plus size={14} />}>New Parent</Button>}
+        actions={<Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowNewModal(true)}>New Parent</Button>}
       />
       <Card>
         <div className="el-search-bar" style={{ maxWidth: 400, marginBottom: 'var(--space-4)' }}>
@@ -91,6 +96,8 @@ export function Parents() {
           emptyState={<EmptyState icon={<Users size={24} />} title="No parents" description="Add parents to link them with students." />}
         />
       </Card>
+
+      <NewParentModal open={showNewModal} onClose={() => setShowNewModal(false)} onSaved={loadParents} />
     </div>
   );
 }

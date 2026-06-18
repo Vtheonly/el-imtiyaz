@@ -7,6 +7,7 @@ import { Plus, User } from 'lucide-react';
 import { Card, Button, EmptyState, Badge } from '../components/common';
 import { PageHeader } from '../components/common/PageHeader';
 import { DataGrid, Column } from '../components/data/DataGrid';
+import { NewEmployeeModal } from '../components/forms/NewEmployeeModal';
 import { USER_ROLE_LABELS, UserRole } from '@core/enums';
 
 interface EmployeeRow {
@@ -23,25 +24,29 @@ interface EmployeeRow {
 export function Employees() {
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showNewModal, setShowNewModal] = useState(false);
+
+  const loadEmployees = async () => {
+    setLoading(true);
+    try {
+      const rows = await window.elImtiyaz.employees.list();
+      setEmployees((rows as any[]).map((e) => ({
+        id: e.id.value,
+        employeeCode: e.employeeCode,
+        fullName: e.fullName,
+        email: e.email,
+        phone: e.phone,
+        role: e.role,
+        title: e.title,
+        isActive: e.isActive
+      })));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const rows = await window.elImtiyaz.employees.list();
-        setEmployees((rows as any[]).map((e) => ({
-          id: e.id.value,
-          employeeCode: e.employeeCode,
-          fullName: e.fullName,
-          email: e.email,
-          phone: e.phone,
-          role: e.role,
-          title: e.title,
-          isActive: e.isActive
-        })));
-      } finally {
-        setLoading(false);
-      }
-    })();
+    loadEmployees();
   }, []);
 
   const columns: Column<EmployeeRow>[] = [
@@ -88,7 +93,7 @@ export function Employees() {
       <PageHeader
         title="Employees"
         subtitle={`${employees.length} staff members`}
-        actions={<Button variant="primary" icon={<Plus size={14} />}>New Employee</Button>}
+        actions={<Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowNewModal(true)}>New Employee</Button>}
       />
       <Card>
         <DataGrid
@@ -99,6 +104,8 @@ export function Employees() {
           emptyState={<EmptyState icon={<User size={24} />} title="No employees" description="Add staff to manage permissions." />}
         />
       </Card>
+
+      <NewEmployeeModal open={showNewModal} onClose={() => setShowNewModal(false)} onSaved={loadEmployees} />
     </div>
   );
 }

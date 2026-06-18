@@ -8,6 +8,7 @@ import { Plus, Upload, Download, Search, Filter } from 'lucide-react';
 import { Card, Badge, Button, EmptyState } from '../components/common';
 import { PageHeader } from '../components/common/PageHeader';
 import { DataGrid, Column } from '../components/data/DataGrid';
+import { NewStudentModal } from '../components/forms/NewStudentModal';
 import { formatDZD, formatDate } from '@shared/currency';
 import { STUDENT_STATUS_COLORS, STUDENT_STATUS_LABELS, StudentStatus } from '@core/enums';
 
@@ -28,6 +29,7 @@ export function Students() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StudentStatus | ''>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showNewModal, setShowNewModal] = useState(false);
 
   const loadStudents = async () => {
     setLoading(true);
@@ -121,7 +123,7 @@ export function Students() {
           <>
             <Button variant="ghost" icon={<Upload size={14} />}>Import</Button>
             <Button variant="ghost" icon={<Download size={14} />} onClick={() => window.elImtiyaz.reports.export('students')}>Export</Button>
-            <Button variant="primary" icon={<Plus size={14} />} onClick={() => navigate('/students?action=new')}>
+            <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowNewModal(true)}>
               New Student
             </Button>
           </>
@@ -180,6 +182,8 @@ export function Students() {
           }
         />
       </Card>
+
+      <NewStudentModal open={showNewModal} onClose={() => setShowNewModal(false)} onSaved={loadStudents} />
     </div>
   );
 }
