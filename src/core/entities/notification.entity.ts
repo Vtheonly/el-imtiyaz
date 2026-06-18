@@ -1,5 +1,5 @@
 /**
- * Notification entity — in-app, email, SMS, and WhatsApp messages.
+ * Notification entity — in-app and email messages.
  *
  * Notifications are queued with a status (pending → sent → delivered → read).
  * The NotificationService subscribes to domain events (payment.overdue,
@@ -9,7 +9,7 @@
 
 import { Identifier } from '../value-objects/identifier';
 
-export type NotificationChannel = 'in_app' | 'email' | 'sms' | 'whatsapp';
+export type NotificationChannel = 'in_app' | 'email';
 export type NotificationCategory = 'payment' | 'student' | 'attendance' | 'system' | 'workflow' | 'announcement';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type NotificationStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';

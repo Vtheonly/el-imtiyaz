@@ -4,7 +4,7 @@
  * Examples:
  *   - `payment.recorded` → audit service logs the action
  *   - `student.enrolled` → fee template service auto-creates invoices
- *   - `invoice.overdue` → notification service queues an SMS reminder
+ *   - `invoice.overdue` → notification service queues an email reminder
  *
  * The bus is synchronous within the main process; all handlers run to
  * completion before the publisher continues. This keeps audit logging

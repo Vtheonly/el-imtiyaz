@@ -105,9 +105,6 @@ export function registerIpcHandlers(deps: RegistryDependencies): void {
         throw new Error(`Resend email sending failed: ${res.error}`);
       }
     },
-    sendSms: async (_to: string, _message: string) => {
-      logger.info('workflow.node.send_sms.stub', { to: _to });
-    },
     applyDiscount: async (studentId: string, percentage: number, reason: string) => {
       const invoices = await repos.invoices.list({ studentId });
       for (const inv of invoices) {

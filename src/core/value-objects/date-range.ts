@@ -9,18 +9,21 @@ export class DateRange {
   readonly end: Date;
 
   constructor(start: Date | string, end: Date | string) {
-    this.start = typeof start === 'string' ? new Date(start) : start;
-    this.end = typeof end === 'string' ? new Date(end) : end;
+    const s = typeof start === 'string' ? new Date(start) : start;
+    const e = typeof end === 'string' ? new Date(end) : end;
 
-    if (Number.isNaN(this.start.getTime())) {
+    if (!s || Number.isNaN(s.getTime())) {
       throw new Error(`Invalid start date: ${start}`);
     }
-    if (Number.isNaN(this.end.getTime())) {
+    if (!e || Number.isNaN(e.getTime())) {
       throw new Error(`Invalid end date: ${end}`);
     }
-    if (this.end < this.start) {
+    if (e < s) {
       throw new Error('DateRange end cannot be before start');
     }
+
+    this.start = s;
+    this.end = e;
   }
 
   contains(date: Date | string): boolean {

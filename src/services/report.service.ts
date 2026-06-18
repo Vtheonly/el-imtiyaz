@@ -53,21 +53,21 @@ export class ReportService {
       ? new DateRange(rangeInput.start, rangeInput.end)
       : DateRange.thisMonth();
 
-    const stmt = this.payments.raw.prepare(
+    const rows = this.payments.raw.all<{
+      date: string;
+      method: string;
+      total: number;
+      count: number;
+    }>(
       `SELECT date(payment_date) as date, payment_method as method,
               SUM(amount) as total, COUNT(*) as count
        FROM payments
        WHERE deleted_at IS NULL AND status = 'paid'
          AND payment_date >= ? AND payment_date <= ?
        GROUP BY date, method
-       ORDER BY date`
+       ORDER BY date`,
+      [range.start.toISOString(), range.end.toISOString()]
     );
-    const rows = (stmt.all as any)(range.start.toISOString(), range.end.toISOString()) as Array<{
-      date: string;
-      method: string;
-      total: number;
-      count: number;
-    }>;
 
     const byMethod: Record<string, number> = {};
     const byDayMap = new Map<string, { total: number; count: number }>();
@@ -95,12 +95,12 @@ export class ReportService {
   }
 
   async outstanding(): Promise<OutstandingReport> {
-    const totalRow = this.invoices.raw.prepare(
+    const totalRow = this.invoices.raw.get<{ total: number }>(
       `SELECT COALESCE(SUM(amount_due - discount_amount - amount_paid), 0) as total
        FROM invoices WHERE deleted_at IS NULL`
-    ).get() as { total: number };
+    )!;
 
-    const classRows = this.invoices.raw.prepare(
+    const classRows = this.invoices.raw.all<{ class_id: string; class_name: string; outstanding: number; student_count: number }>(
       `SELECT s.class_id, c.name as class_name,
               SUM(i.amount_due - i.discount_amount - i.amount_paid) as outstanding,
               COUNT(DISTINCT s.id) as student_count
@@ -111,7 +111,7 @@ export class ReportService {
        GROUP BY s.class_id
        HAVING outstanding > 0
        ORDER BY outstanding DESC`
-    ).all() as Array<{ class_id: string; class_name: string; outstanding: number; student_count: number }>;
+    );
 
     return {
       totalOutstanding: totalRow.total,

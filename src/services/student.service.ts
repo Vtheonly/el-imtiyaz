@@ -3,14 +3,21 @@
  * profile aggregation, and audit event emission.
  */
 
-import { StudentRepository } from '../infrastructure/repositories/student.repository';
-import { ParentRepository } from '../infrastructure/repositories/parent.repository';
-import { PaymentRepository } from '../infrastructure/repositories/payment.repository';
-import type { Student, CreateStudentInput, UpdateStudentInput, StudentDocument } from '../core/entities/student.entity';
-import type { IEventBus } from '../core/interfaces/event-bus.interface';
-import { StudentStatus } from '../core/enums';
-import { ValidationError, NotFoundError } from '../infrastructure/error/app-error';
-import { logger } from '../infrastructure/logger/logger';
+import { StudentRepository } from "../infrastructure/repositories/student.repository";
+import { ParentRepository } from "../infrastructure/repositories/parent.repository";
+import type {
+  Student,
+  CreateStudentInput,
+  UpdateStudentInput,
+  StudentDocument,
+} from "../core/entities/student.entity";
+import type { IEventBus } from "../core/interfaces/event-bus.interface";
+import { StudentStatus } from "../core/enums";
+import {
+  ValidationError,
+  NotFoundError,
+} from "../infrastructure/error/app-error";
+import { logger } from "../infrastructure/logger/logger";
 
 interface ListQuery {
   search?: string;
@@ -36,16 +43,16 @@ export interface PaymentTimelineEntry {
   label: string;
   amountDue: number;
   amountPaid: number;
-  status: 'paid' | 'partial' | 'missing';
+  status: "paid" | "partial" | "missing";
 }
 
 export class StudentService {
-  readonly serviceName = 'StudentService';
+  readonly serviceName = "StudentService";
 
   constructor(
     private readonly students: StudentRepository,
     private readonly parents: ParentRepository,
-    private readonly eventBus: IEventBus
+    private readonly eventBus: IEventBus,
   ) {}
 
   async list(query: ListQuery): Promise<Student[]> {
@@ -55,19 +62,19 @@ export class StudentService {
       classId: query.classId,
       parent_id: query.parentId,
       page: query.page,
-      pageSize: query.pageSize
+      pageSize: query.pageSize,
     });
   }
 
   async getById(id: string): Promise<Student> {
     const student = await this.students.findById(id);
-    if (!student) throw new NotFoundError('Student', id);
-    return student;
+    if (!student) throw new NotFoundError("Student", id);
+    return student as Student;
   }
 
   async search(term: string): Promise<Student[]> {
     if (!term || term.trim().length < 2) {
-      throw new ValidationError('Search term must be at least 2 characters');
+      throw new ValidationError("Search term must be at least 2 characters");
     }
     return this.students.list({ search: term, pageSize: 20 });
   }
@@ -78,20 +85,25 @@ export class StudentService {
     // Verify all referenced parents exist
     for (const parentId of input.parentIds) {
       const parent = await this.parents.findById(parentId);
-      if (!parent) throw new NotFoundError('Parent', parentId);
+      if (!parent) throw new NotFoundError("Parent", parentId);
     }
 
     const student = await this.students.create(input);
-    await this.students.update(student.id.value, { status: StudentStatus.ACTIVE });
-
-    await this.eventBus.publish('student.created', {
-      entityId: student.id.value,
-      entityType: 'Student',
-      after: student,
-      actor: { actorId: 'system', actorName: 'System' }
+    await this.students.update(student.id.value, {
+      status: StudentStatus.ACTIVE,
     });
 
-    logger.info('student.created', { id: student.id.value, code: student.studentCode });
+    await this.eventBus.publish("student.created", {
+      entityId: student.id.value,
+      entityType: "Student",
+      after: student,
+      actor: { actorId: "system", actorName: "System" },
+    });
+
+    logger.info("student.created", {
+      id: student.id.value,
+      code: student.studentCode,
+    });
     return student;
   }
 
@@ -99,12 +111,12 @@ export class StudentService {
     const before = await this.getById(id);
     const updated = await this.students.update(id, patch);
 
-    await this.eventBus.publish('student.updated', {
+    await this.eventBus.publish("student.updated", {
       entityId: id,
-      entityType: 'Student',
+      entityType: "Student",
       before,
       after: updated,
-      actor: { actorId: 'system', actorName: 'System' }
+      actor: { actorId: "system", actorName: "System" },
     });
 
     return updated;
@@ -114,17 +126,23 @@ export class StudentService {
     const before = await this.getById(id);
     await this.students.delete(id);
 
-    await this.eventBus.publish('student.deleted', {
+    await this.eventBus.publish("student.deleted", {
       entityId: id,
-      entityType: 'Student',
+      entityType: "Student",
       before,
-      actor: { actorId: 'system', actorName: 'System' }
+      actor: { actorId: "system", actorName: "System" },
     });
   }
 
-  async addDocument(studentId: string, document: StudentDocument): Promise<void> {
+  async addDocument(
+    studentId: string,
+    document: StudentDocument,
+  ): Promise<void> {
     await this.students.addDocument(studentId, document);
-    logger.info('student.document.added', { studentId, filename: document.filename });
+    logger.info("student.document.added", {
+      studentId,
+      filename: document.filename,
+    });
   }
 
   async getDocuments(studentId: string): Promise<StudentDocument[]> {
@@ -143,7 +161,12 @@ export class StudentService {
     for (let i = 0; i < rows.length; i++) {
       try {
         const row = rows[i];
-        if (!row.firstName || !row.lastName || !row.dateOfBirth || !row.parentIds?.length) {
+        if (
+          !row.firstName ||
+          !row.lastName ||
+          !row.dateOfBirth ||
+          !row.parentIds?.length
+        ) {
           throw new ValidationError(`Row ${i + 1}: missing required fields`);
         }
         await this.create(row as CreateStudentInput);
@@ -151,11 +174,14 @@ export class StudentService {
       } catch (err) {
         failed++;
         errors.push({ row: i + 1, error: (err as Error).message });
-        logger.warn('student.import.row.failed', { row: i + 1, error: (err as Error).message });
+        logger.warn("student.import.row.failed", {
+          row: i + 1,
+          error: (err as Error).message,
+        });
       }
     }
 
-    logger.info('student.bulk-import.complete', { imported, failed });
+    logger.info("student.bulk-import.complete", { imported, failed });
     return { imported, failed, errors };
   }
 
@@ -164,23 +190,34 @@ export class StudentService {
   }
 
   async getFinancialProfile(id: string): Promise<StudentFinancialProfile> {
-    const student = await this.getById(id);
+    const student = (await this.getById(id)) as Student;
 
-    // Aggregations are computed in-process here. For large datasets this
-    // would move to a SQL view — kept simple for v1.
-    const payments = await this.students.raw.prepare(
+    const payments = this.students.raw.all<{
+      amount: number;
+      payment_date: string;
+      receipt_number: string;
+    }>(
       `SELECT amount, payment_date, receipt_number FROM payments
        WHERE student_id = ? AND deleted_at IS NULL AND status = 'paid'
-       ORDER BY payment_date DESC`
-    ).all(id) as Array<{ amount: number; payment_date: string; receipt_number: string }>;
+       ORDER BY payment_date DESC`,
+      [id],
+    );
 
-    const invoices = await this.students.raw.prepare(
+    const invoices = this.students.raw.all<{
+      amount_due: number;
+      discount_amount: number;
+      amount_paid: number;
+    }>(
       `SELECT amount_due, discount_amount, amount_paid FROM invoices
-       WHERE student_id = ? AND deleted_at IS NULL`
-    ).all(id) as Array<{ amount_due: number; discount_amount: number; amount_paid: number }>;
+       WHERE student_id = ? AND deleted_at IS NULL`,
+      [id],
+    );
 
     const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-    const totalOwed = invoices.reduce((s, i) => s + (i.amount_due - i.discount_amount), 0);
+    const totalOwed = invoices.reduce(
+      (s, i) => s + (i.amount_due - i.discount_amount),
+      0,
+    );
     const outstandingBalance = totalOwed - totalPaid;
 
     return {
@@ -189,15 +226,24 @@ export class StudentService {
       totalOwed,
       outstandingBalance,
       lastPayment: payments[0]
-        ? { amount: payments[0].amount, date: payments[0].payment_date, receiptNumber: payments[0].receipt_number }
+        ? {
+            amount: payments[0].amount,
+            date: payments[0].payment_date,
+            receiptNumber: payments[0].receipt_number,
+          }
         : undefined,
       paymentCount: payments.length,
-      scholarshipActive: false
+      scholarshipActive: false,
     };
   }
 
   async getPaymentTimeline(id: string): Promise<PaymentTimelineEntry[]> {
-    const rows = await this.students.raw.prepare(
+    const rows = this.students.raw.all<{
+      period: string;
+      label: string;
+      amount_due: number;
+      amount_paid: number;
+    }>(
       `SELECT
          strftime('%Y-%m', issued_at) as period,
          strftime('%Y-%m', issued_at) as label,
@@ -205,24 +251,36 @@ export class StudentService {
          SUM(amount_paid) as amount_paid
        FROM invoices
        WHERE student_id = ? AND deleted_at IS NULL
-       GROUP BY period ORDER BY period`
-    ).all(id) as Array<{ period: string; label: string; amount_due: number; amount_paid: number }>;
+       GROUP BY period ORDER BY period`,
+      [id],
+    );
 
     return rows.map((r) => ({
       period: r.period,
       label: r.label,
       amountDue: r.amount_due,
       amountPaid: r.amount_paid,
-      status: r.amount_paid >= r.amount_due ? 'paid' : r.amount_paid > 0 ? 'partial' : 'missing'
+      status:
+        r.amount_paid >= r.amount_due
+          ? "paid"
+          : r.amount_paid > 0
+            ? "partial"
+            : "missing",
     }));
   }
 
   private validateInput(input: CreateStudentInput): void {
-    if (!input.firstName?.trim()) throw new ValidationError('First name is required');
-    if (!input.lastName?.trim()) throw new ValidationError('Last name is required');
-    if (!input.dateOfBirth) throw new ValidationError('Date of birth is required');
-    if (!input.parentIds?.length) throw new ValidationError('At least one parent is required');
-    if (!input.address?.line1) throw new ValidationError('Address line 1 is required');
-    if (!input.address?.city) throw new ValidationError('Address city is required');
+    if (!input.firstName?.trim())
+      throw new ValidationError("First name is required");
+    if (!input.lastName?.trim())
+      throw new ValidationError("Last name is required");
+    if (!input.dateOfBirth)
+      throw new ValidationError("Date of birth is required");
+    if (!input.parentIds?.length)
+      throw new ValidationError("At least one parent is required");
+    if (!input.address?.line1)
+      throw new ValidationError("Address line 1 is required");
+    if (!input.address?.city)
+      throw new ValidationError("Address city is required");
   }
 }

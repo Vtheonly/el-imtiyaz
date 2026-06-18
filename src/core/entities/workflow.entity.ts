@@ -3,7 +3,7 @@
  *
  * A workflow is a directed acyclic graph (DAG) of nodes. Each node has:
  *   - A type (trigger, condition, action)
- *   - A subtype (e.g. "payment.overdue", "send.sms", "apply.discount")
+ *   - A subtype (e.g. "payment.overdue", "send.email", "apply.discount")
  *   - A config object (typed per subtype)
  *   - Input/output ports (typed connections)
  *
@@ -35,7 +35,7 @@ export interface WorkflowNodePosition {
 export interface WorkflowNode {
   id: string;
   type: NodeType;
-  subtype: string;         // e.g. 'trigger.payment.overdue', 'action.send.sms'
+  subtype: string;         // e.g. 'trigger.payment.overdue', 'action.send.email'
   label: string;
   config: Record<string, unknown>;
   position: WorkflowNodePosition;

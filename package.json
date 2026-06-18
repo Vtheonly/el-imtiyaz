@@ -15,8 +15,8 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build:preload": "tsc -p tsconfig.preload.json",
     "build:renderer": "vite build",
-    "start": "npm run build && electron .",
-    "start:dev": "concurrently -k -n ELECTRON,VITE -c yellow,cyan \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\" \"vite\"",
+    "start": "npm run build && electron . --no-sandbox",
+    "start:dev": "concurrently -k -n ELECTRON,VITE -c yellow,cyan \"wait-on tcp:5173 && cross-env NODE_ENV=development electron . --no-sandbox\" \"vite\"",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.preload.json --noEmit && tsc -p tsconfig.json --noEmit",
     "package": "npm run build && electron-builder",
@@ -99,7 +99,10 @@
       "icon": "resources/icon.png"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "resources/icon.png"
     }
   }

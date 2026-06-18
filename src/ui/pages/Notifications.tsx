@@ -1,5 +1,5 @@
 /**
- * Notifications — center for in-app, email, SMS, WhatsApp messages.
+ * Notifications — center for in-app and email messages.
  */
 
 import { useEffect, useState } from 'react';
@@ -34,9 +34,7 @@ const PRIORITY_ICONS: Record<string, React.ReactNode> = {
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   in_app: <Bell size={14} />,
-  email: <Mail size={14} />,
-  sms: <MessageSquare size={14} />,
-  whatsapp: <MessageSquare size={14} />
+  email: <Mail size={14} />
 };
 
 export function Notifications() {

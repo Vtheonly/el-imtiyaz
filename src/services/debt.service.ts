@@ -48,43 +48,44 @@ export class DebtService {
   ) {}
 
   async getSchoolSummary(): Promise<SchoolDebtSummary> {
-    // Total outstanding: sum of (amount_due - discount - amount_paid) across all invoices
-    const outstandingRow = this.invoices.raw.prepare(
+    const outstandingRow = this.invoices.raw.get<{ total: number }>(
       `SELECT COALESCE(SUM(amount_due - discount_amount - amount_paid), 0) as total
        FROM invoices WHERE deleted_at IS NULL AND status NOT IN ('cancelled', 'refunded')`
-    ).get() as { total: number };
+    )!;
 
     const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
-    const collectedYearRow = this.payments.raw.prepare(
+    const collectedYearRow = this.payments.raw.get<{ total: number }>(
       `SELECT COALESCE(SUM(amount), 0) as total FROM payments
-       WHERE deleted_at IS NULL AND status = 'paid' AND payment_date >= ?`
-    ).get(yearStart) as { total: number };
+       WHERE deleted_at IS NULL AND status = 'paid' AND payment_date >= ?`,
+      [yearStart]
+    )!;
 
-    const collectedMonthRow = this.payments.raw.prepare(
+    const collectedMonthRow = this.payments.raw.get<{ total: number }>(
       `SELECT COALESCE(SUM(amount), 0) as total FROM payments
-       WHERE deleted_at IS NULL AND status = 'paid' AND payment_date >= ?`
-    ).get(monthStart) as { total: number };
+       WHERE deleted_at IS NULL AND status = 'paid' AND payment_date >= ?`,
+      [monthStart]
+    )!;
 
-    const debtorsRow = this.invoices.raw.prepare(
+    const debtorsRow = this.invoices.raw.get<{ count: number }>(
       `SELECT COUNT(DISTINCT student_id) as count FROM invoices
        WHERE deleted_at IS NULL AND (amount_due - discount_amount - amount_paid) > 0`
-    ).get() as { count: number };
+    )!;
 
-    const overdueRow = this.invoices.raw.prepare(
+    const overdueRow = this.invoices.raw.get<{ count: number }>(
       `SELECT COUNT(*) as count FROM invoices
        WHERE deleted_at IS NULL
          AND due_date < date('now')
          AND (amount_due - discount_amount - amount_paid) > 0`
-    ).get() as { count: number };
+    )!;
 
     // Largest debtor
-    const largestDebtorRow = this.invoices.raw.prepare(
+    const largestDebtorRow = this.invoices.raw.get<{ student_id: string; debt: number }>(
       `SELECT student_id, SUM(amount_due - discount_amount - amount_paid) as debt
        FROM invoices WHERE deleted_at IS NULL
        GROUP BY student_id ORDER BY debt DESC LIMIT 1`
-    ).get() as { student_id: string; debt: number } | undefined;
+    );
 
     let largestDebtor: SchoolDebtSummary['largestDebtor'] | undefined;
     if (largestDebtorRow && largestDebtorRow.student_id) {
@@ -107,7 +108,13 @@ export class DebtService {
   async getStudentsWithDebt(query: { limit?: number } = {}): Promise<StudentDebt[]> {
     const limit = query.limit ?? 100;
 
-    const rows = this.invoices.raw.prepare(
+    const rows = this.invoices.raw.all<{
+      student_id: string;
+      total_invoiced: number;
+      total_paid: number;
+      outstanding: number;
+      oldest_invoice: string;
+    }>(
       `SELECT student_id,
               SUM(amount_due - discount_amount) as total_invoiced,
               SUM(amount_paid) as total_paid,
@@ -117,27 +124,23 @@ export class DebtService {
        GROUP BY student_id
        HAVING outstanding > 0
        ORDER BY outstanding DESC
-       LIMIT ?`
-    ).all(limit) as Array<{
-      student_id: string;
-      total_invoiced: number;
-      total_paid: number;
-      outstanding: number;
-      oldest_invoice: string;
-    }>;
+       LIMIT ?`,
+      [limit]
+    );
 
     const results: StudentDebt[] = [];
     for (const row of rows) {
       const student = await this.students.findById(row.student_id);
       if (!student) continue;
 
-      const overdueRow = this.invoices.raw.prepare(
+      const overdueRow = this.invoices.raw.get<{ total: number }>(
         `SELECT COALESCE(SUM(amount_due - discount_amount - amount_paid), 0) as total
          FROM invoices
          WHERE deleted_at IS NULL AND student_id = ?
            AND due_date < date('now')
-           AND (amount_due - discount_amount - amount_paid) > 0`
-      ).get(row.student_id) as { total: number };
+           AND (amount_due - discount_amount - amount_paid) > 0`,
+        [row.student_id]
+      )!;
 
       results.push({
         student,
@@ -153,7 +156,14 @@ export class DebtService {
   }
 
   async getOverduePayments(): Promise<OverduePayment[]> {
-    const rows = this.invoices.raw.prepare(
+    const rows = this.invoices.raw.all<{
+      invoice_id: string;
+      student_id: string;
+      student_name: string;
+      amount: number;
+      due_date: string;
+      days_overdue: number;
+    }>(
       `SELECT i.id as invoice_id, i.student_id, s.full_name as student_name,
               (i.amount_due - i.discount_amount - i.amount_paid) as amount,
               i.due_date,
@@ -164,14 +174,7 @@ export class DebtService {
          AND i.due_date < date('now')
          AND (i.amount_due - i.discount_amount - i.amount_paid) > 0
        ORDER BY days_overdue DESC`
-    ).all() as Array<{
-      invoice_id: string;
-      student_id: string;
-      student_name: string;
-      amount: number;
-      due_date: string;
-      days_overdue: number;
-    }>;
+    );
 
     logger.info('debt.overdue.fetched', { count: rows.length });
 
