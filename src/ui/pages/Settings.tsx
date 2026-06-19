@@ -1,19 +1,14 @@
-/**
- * Settings — school configuration, backup/restore, appearance.
- */
-
-import { useState } from 'react';
-import { Settings as SettingsIcon, Database, Save, Palette, FileDown } from 'lucide-react';
-import { Card, Button, Badge } from '../components/common';
-import { PageHeader } from '../components/common/PageHeader';
-import { PALETTE } from '@shared/constants';
+import React, { useState } from "react";
+import { Save, ShieldAlert, KeyRound, Database, FileDown } from "lucide-react";
+import { Card, Button, Badge, StatBlock } from "../components/common";
+import { PageHeader } from "../components/common/PageHeader";
+import { PALETTE } from "@shared/constants";
+import toast from "react-hot-toast";
 
 export function Settings() {
-  const [schoolName, setSchoolName] = useState('El-Imtiyaz Private School');
-  const [schoolAddress, setSchoolAddress] = useState('Algiers, Algeria');
-  const [schoolPhone, setSchoolPhone] = useState('+213 00 00 00 00');
-  const [schoolEmail, setSchoolEmail] = useState('contact@el-imtiyaz.dz');
-  const [currency, setCurrency] = useState('DZD');
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [backing, setBacking] = useState(false);
   const [backupResult, setBackupResult] = useState<string | null>(null);
@@ -23,81 +18,127 @@ export function Settings() {
     try {
       const result = await window.elImtiyaz.system.backup();
       setBackupResult((result as any).path);
+      toast.success("Database backed up successfully.");
     } catch (err) {
       setBackupResult(`Backup failed: ${(err as Error).message}`);
+      toast.error("Failed to generate backup.");
     } finally {
       setBacking(false);
     }
   };
 
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    const savedPassword =
+      localStorage.getItem("el-imtiyaz:password") || "admin";
+
+    if (currentPassword !== savedPassword) {
+      toast.error("Current password verification failed.");
+      return;
+    }
+    if (!newPassword.trim()) {
+      toast.error("New password cannot be blank.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Password confirmation match error.");
+      return;
+    }
+
+    localStorage.setItem("el-imtiyaz:password", newPassword);
+    toast.success("Security password updated successfully!");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
   return (
     <div className="el-page">
-      <PageHeader title="Settings" subtitle="School configuration & system tools" />
+      <PageHeader
+        title="System Settings"
+        subtitle="Configure system parameters and security controls"
+      />
 
       <div className="flex flex-col gap-4">
-        {/* School Identity */}
-        <Card title="School Identity" subtitle="Used on receipts, reports, and exports">
-          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+        {/* Security Password Panel */}
+        <Card
+          title={
+            <div className="flex items-center gap-2">
+              <KeyRound
+                size={18}
+                style={{ color: "var(--color-primary-blue)" }}
+              />
+              <span>Change Security Password</span>
+            </div>
+          }
+          subtitle="Update the local administrative password used at startup"
+        >
+          <form
+            onSubmit={handleChangePassword}
+            className="grid"
+            style={{
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "var(--space-3)",
+            }}
+          >
             <div>
-              <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>School Name</label>
-              <input className="el-input" style={{ width: '100%' }} value={schoolName} onChange={(e) => setSchoolName(e.target.value)} />
+              <label className="el-stat__label">Current Password</label>
+              <input
+                type="password"
+                className="el-input w-full"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Verify existing password"
+              />
             </div>
             <div>
-              <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Phone</label>
-              <input className="el-input" style={{ width: '100%' }} value={schoolPhone} onChange={(e) => setSchoolPhone(e.target.value)} />
+              <label className="el-stat__label">New Password</label>
+              <input
+                type="password"
+                className="el-input w-full"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Choose strong password"
+              />
             </div>
-            <div>
-              <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Address</label>
-              <input className="el-input" style={{ width: '100%' }} value={schoolAddress} onChange={(e) => setSchoolAddress(e.target.value)} />
-            </div>
-            <div>
-              <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Email</label>
-              <input className="el-input" style={{ width: '100%' }} value={schoolEmail} onChange={(e) => setSchoolEmail(e.target.value)} />
-            </div>
-            <div>
-              <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Currency</label>
-              <div className="el-select" style={{ width: '100%' }}>
-                <select value={currency} onChange={(e) => setCurrency(e.target.value)} style={{ width: '100%' }}>
-                  <option value="DZD">DZD — Algerian Dinar</option>
-                </select>
+            <div className="flex items-end gap-2">
+              <div style={{ flex: 1 }}>
+                <label className="el-stat__label">Confirm New Password</label>
+                <input
+                  type="password"
+                  className="el-input w-full"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-type new password"
+                />
               </div>
+              <Button type="submit" variant="primary">
+                Update
+              </Button>
             </div>
-          </div>
-          <div className="flex justify-end" style={{ marginTop: 'var(--space-4)' }}>
-            <Button variant="primary" icon={<Save size={14} />}>Save Changes</Button>
-          </div>
+          </form>
         </Card>
 
-        {/* Brand Palette */}
-        <Card title="Brand Palette" subtitle="El-Imtiyaz Academic Brand">
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(PALETTE).filter(([k]) => !k.includes('RGB') && !k.includes('TINT')).map(([key, value]) => (
-              <div key={key} className="flex items-center gap-2" style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 'var(--radius-sm)',
-                  background: value as string,
-                  border: '1px solid var(--border-default)',
-                  boxShadow: `0 0 12px ${value}33`
-                }} />
-                <div>
-                  <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)' }}>{key}</div>
-                  <div className="text-mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{value}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* System Tools */}
-        <Card title="System Tools" subtitle="Backup & maintenance">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+        {/* Database & Backups Panel */}
+        <Card
+          title="Database Maintenance & Backups"
+          subtitle="Generate instant snapshots of your school database files"
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-center">
               <div>
-                <div style={{ fontWeight: 'var(--weight-medium)' }}>Database Backup</div>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
-                  Creates a timestamped snapshot of the SQLite database.
+                <div style={{ fontWeight: "var(--weight-medium)" }}>
+                  Generate Database Snapshot
+                </div>
+                <div
+                  style={{
+                    fontSize: "var(--text-xs)",
+                    color: "var(--color-text-tertiary)",
+                    marginTop: 2,
+                  }}
+                >
+                  Exports a timestamped copy of your SQLite database inside the
+                  OS directory.
                 </div>
               </div>
               <Button
@@ -106,50 +147,85 @@ export function Settings() {
                 onClick={handleBackup}
                 disabled={backing}
               >
-                {backing ? 'Backing up…' : 'Backup Now'}
+                {backing ? "Backing up..." : "Backup Now"}
               </Button>
             </div>
 
             {backupResult && (
-              <div className="el-card" style={{ background: 'var(--color-primary-tint-08)', padding: 'var(--space-3)' }}>
-                <div className="flex items-center gap-2">
-                  <FileDown size={14} style={{ color: 'var(--color-primary-blue)' }} />
-                  <span style={{ fontSize: 'var(--text-sm)' }}>Backup saved to:</span>
-                  <code className="text-mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-primary-blue)' }}>
-                    {backupResult}
-                  </code>
-                </div>
+              <div
+                style={{
+                  padding: 10,
+                  background: "var(--color-primary-tint-08)",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border-primary)",
+                  fontSize: "var(--text-xs)",
+                }}
+              >
+                <span
+                  style={{
+                    color: "var(--color-primary-blue)",
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {backupResult}
+                </span>
               </div>
             )}
+          </div>
+        </Card>
 
-            <div className="el-divider" />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div style={{ fontWeight: 'var(--weight-medium)' }}>Application Logs</div>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
-                  Open the logs folder to inspect rolling log files.
+        {/* Brand palette info */}
+        <Card
+          title="System Theme Details"
+          subtitle="Active academic design tokens"
+        >
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(PALETTE)
+              .filter(([k]) => !k.includes("RGB") && !k.includes("TINT"))
+              .map(([key, value]) => (
+                <div
+                  key={key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 8,
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "var(--radius-md)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 24,
+                      height: 24,
+                      background: value as string,
+                      borderRadius: "var(--radius-xs)",
+                      border: "1px solid var(--border-default)",
+                    }}
+                  />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "var(--color-text-secondary)",
+                        fontWeight: "var(--weight-semibold)",
+                      }}
+                    >
+                      {key}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "var(--color-text-tertiary)",
+                        fontFamily: "var(--font-mono)",
+                      }}
+                    >
+                      {value}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <Badge tone="neutral">Available via Help menu</Badge>
-            </div>
-
-            <div className="el-divider" />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div style={{ fontWeight: 'var(--weight-medium)' }}>System Info</div>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
-                  Version, platform, and runtime details.
-                </div>
-              </div>
-              <Button variant="ghost" onClick={async () => {
-                const info = await window.elImtiyaz.system.info();
-                alert(JSON.stringify(info, null, 2));
-              }}>
-                Show Info
-              </Button>
-            </div>
+              ))}
           </div>
         </Card>
       </div>

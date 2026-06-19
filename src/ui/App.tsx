@@ -1,16 +1,13 @@
-/**
- * App — root component. Handles routing, global UI state (command palette,
- * global search, loading screen), and menu-command subscriptions.
- */
-
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { CommandPalette } from "./components/layout/CommandPalette";
 import { GlobalSearch } from "./components/search/GlobalSearch";
 import { LoadingScreen } from "./pages/LoadingScreen";
+import { Login } from "./pages/Login";
 
 import { Dashboard } from "./pages/Dashboard";
 import { Students } from "./pages/Students";
@@ -32,6 +29,8 @@ import { Notifications } from "./pages/Notifications";
 import { FeeTemplates } from "./pages/FeeTemplates";
 import { Scholarships } from "./pages/Scholarships";
 
+import type { RootState } from "./state/store";
+
 export function App() {
   const navigate = useNavigate();
   const [booting, setBooting] = useState(true);
@@ -39,19 +38,19 @@ export function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Global keyboard shortcuts
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.session.isAuthenticated,
+  );
+
+  // Global Keyboard listener
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
-
-      // Cmd+K → command palette
       if (isMod && e.key === "k") {
         e.preventDefault();
         setCommandPaletteOpen((v) => !v);
         return;
       }
-
-      // Cmd+Shift+F → global search
       if (isMod && e.shiftKey && e.key === "F") {
         e.preventDefault();
         setSearchOpen(true);
@@ -62,7 +61,7 @@ export function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Subscribe to menu commands from the Electron main process
+  // Sync menu commands
   useEffect(() => {
     if (!window.elImtiyaz) return;
     const unsubscribe = window.elImtiyaz.onMenuCommand((cmd) => {
@@ -74,7 +73,7 @@ export function App() {
         setSearchOpen(true);
       }
     });
-    return unsubscribe;
+    return () => void unsubscribe();
   }, [navigate]);
 
   if (!window.elImtiyaz) {
@@ -86,46 +85,35 @@ export function App() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--bg-app, #242526)",
-          color: "var(--color-text-primary, #eff2f3)",
-          fontFamily: "var(--font-sans, sans-serif)",
+          background: "#242526",
+          color: "#eff2f3",
           padding: "20px",
           textAlign: "center",
         }}
       >
-        <h2 style={{ marginBottom: "10px" }}>
-          Electron Shell Environment Not Detected
-        </h2>
-        <p
-          style={{
-            color: "var(--color-text-secondary, #b0bac0)",
-            maxWidth: "500px",
-            fontSize: "14px",
-            lineHeight: "1.6",
-          }}
-        >
-          This application requires Electron to interact with the local SQLite
-          database. If you are on Linux, please start the app with sandbox
-          checks disabled using:
+        <h2>Electron Environment Not Detected</h2>
+        <p style={{ color: "#b0bac0", marginTop: 10 }}>
+          Please run this application using native Electron scripts via:{" "}
+          <code style={{ background: "rgba(0,0,0,0.3)", padding: "4px 8px" }}>
+            npm start
+          </code>
         </p>
-        <div
-          style={{
-            marginTop: "20px",
-            background: "rgba(0,0,0,0.3)",
-            padding: "10px 15px",
-            borderRadius: "6px",
-            fontFamily: "monospace",
-            fontSize: "13px",
-          }}
-        >
-          npm start
-        </div>
       </div>
     );
   }
 
   if (booting) {
     return <LoadingScreen onReady={() => setBooting(false)} />;
+  }
+
+  // Route guarding check
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
   }
 
   return (
@@ -164,6 +152,7 @@ export function App() {
             <Route path="/fee-templates" element={<FeeTemplates />} />
             <Route path="/scholarships" element={<Scholarships />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
       </div>

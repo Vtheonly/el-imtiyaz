@@ -1,7 +1,42 @@
-/* ───────────────────────────────────────────────────────────────────────
- *  Component styles — primitives, layouts, and complex UI patterns.
- *  Every class is namespaced under .el-* to avoid collisions.
- *  ──────────────────────────────────────────────────────────────────── */
+/* ── Select ────────────────────────────────────────────────── */
+.el-select {
+  position: relative;
+  display: inline-block;
+}
+
+.el-select select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  padding-right: 32px;
+}
+
+.el-select::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-text-tertiary);
+  border-bottom: 2px solid var(--color-text-tertiary);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* Explicit high-contrast dropdown option styles */
+.el-select select option {
+  background-color: #1e1f20 !important; /* Match --color-panel-bg exactly */
+  color: #eff2f3 !important; /* Match --color-text-primary exactly */
+}
 
 /* ── Buttons ───────────────────────────────────────────────── */
 .el-btn {
@@ -41,13 +76,21 @@
 }
 
 .el-btn--primary {
-  background: linear-gradient(135deg, var(--color-deep-blue), var(--color-primary-blue));
+  background: linear-gradient(
+    135deg,
+    var(--color-deep-blue),
+    var(--color-primary-blue)
+  );
   color: white;
   box-shadow: var(--shadow-md), var(--shadow-inset);
 }
 
 .el-btn--primary:hover {
-  background: linear-gradient(135deg, var(--color-primary-blue), var(--color-light-blue));
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-blue),
+    var(--color-light-blue)
+  );
   box-shadow: var(--shadow-glow-md), var(--shadow-inset);
 }
 
@@ -167,8 +210,12 @@
   font-weight: var(--weight-medium);
 }
 
-.el-stat__delta--up { color: var(--color-success); }
-.el-stat__delta--down { color: var(--color-danger); }
+.el-stat__delta--up {
+  color: var(--color-success);
+}
+.el-stat__delta--down {
+  color: var(--color-danger);
+}
 
 /* ── Badges & Pills ────────────────────────────────────────── */
 .el-badge {
@@ -323,40 +370,6 @@
   color: var(--color-text-tertiary);
   display: flex;
   align-items: center;
-}
-
-/* ── Select ────────────────────────────────────────────────── */
-.el-select {
-  position: relative;
-  display: inline-block;
-}
-
-.el-select select {
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--bg-input);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
-  color: var(--color-text-primary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
-  padding-right: 32px;
-}
-
-.el-select::after {
-  content: '';
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid var(--color-text-tertiary);
-  border-bottom: 2px solid var(--color-text-tertiary);
-  transform: translateY(-70%) rotate(45deg);
-  pointer-events: none;
 }
 
 /* ── Sidebar Navigation ────────────────────────────────────── */
@@ -573,13 +586,18 @@
 }
 
 .el-timeline::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 11px;
   top: 4px;
   bottom: 4px;
   width: 2px;
-  background: linear-gradient(to bottom, var(--color-primary-blue), var(--color-deep-blue) 50%, var(--border-default));
+  background: linear-gradient(
+    to bottom,
+    var(--color-primary-blue),
+    var(--color-deep-blue) 50%,
+    var(--border-default)
+  );
   border-radius: var(--radius-full);
 }
 
@@ -596,12 +614,29 @@
   height: 12px;
   border-radius: 50%;
   background: var(--color-primary-blue);
-  box-shadow: 0 0 0 4px var(--bg-panel), 0 0 8px var(--color-primary-blue);
+  box-shadow:
+    0 0 0 4px var(--bg-panel),
+    0 0 8px var(--color-primary-blue);
 }
 
-.el-timeline__dot--success { background: var(--color-success); box-shadow: 0 0 0 4px var(--bg-panel), 0 0 8px var(--color-success); }
-.el-timeline__dot--warning { background: var(--color-warning); box-shadow: 0 0 0 4px var(--bg-panel), 0 0 8px var(--color-warning); }
-.el-timeline__dot--danger { background: var(--color-danger); box-shadow: 0 0 0 4px var(--bg-panel), 0 0 8px var(--color-danger); }
+.el-timeline__dot--success {
+  background: var(--color-success);
+  box-shadow:
+    0 0 0 4px var(--bg-panel),
+    0 0 8px var(--color-success);
+}
+.el-timeline__dot--warning {
+  background: var(--color-warning);
+  box-shadow:
+    0 0 0 4px var(--bg-panel),
+    0 0 8px var(--color-warning);
+}
+.el-timeline__dot--danger {
+  background: var(--color-danger);
+  box-shadow:
+    0 0 0 4px var(--bg-panel),
+    0 0 8px var(--color-danger);
+}
 
 .el-timeline__label {
   font-size: var(--text-xs);
@@ -659,20 +694,26 @@
   transition: color var(--duration-fast) var(--ease-out);
 }
 
-.el-tab:hover { color: var(--color-text-primary); }
+.el-tab:hover {
+  color: var(--color-text-primary);
+}
 
 .el-tab--active {
   color: var(--color-primary-blue);
 }
 
 .el-tab--active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -1px;
   left: var(--space-2);
   right: var(--space-2);
   height: 2px;
-  background: linear-gradient(90deg, var(--color-primary-blue), var(--color-light-blue));
+  background: linear-gradient(
+    90deg,
+    var(--color-primary-blue),
+    var(--color-light-blue)
+  );
   border-radius: var(--radius-full);
   box-shadow: 0 0 8px var(--color-primary-blue);
 }
@@ -703,8 +744,16 @@
   filter: drop-shadow(0 0 4px rgba(52, 155, 212, 0.4));
 }
 
-.el-spinner--sm { width: 16px; height: 16px; border-width: 2px; }
-.el-spinner--lg { width: 48px; height: 48px; border-width: 4px; }
+.el-spinner--sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+.el-spinner--lg {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+}
 
 /* ── Loading Bar (top-of-screen progress) ──────────────────── */
 .el-loading-bar {
@@ -720,8 +769,13 @@
 
 .el-loading-bar__fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-deep-blue), var(--color-primary-blue), var(--color-light-blue));
-  box-shadow: 0 0 8px rgba(52, 155, 212, 0.6);
+  background: linear-gradient(
+    90deg,
+    var(--color-deep-blue),
+    var(--color-primary-blue),
+    var(--color-light-blue)
+  );
+  box-shadow: 0 0 8px rgba(52, 155, 212, 0.4);
   border-radius: var(--radius-full);
   transition: width var(--duration-slow) var(--ease-out);
 }
@@ -844,7 +898,11 @@
   width: 36px;
   height: 36px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-deep-blue), var(--color-primary-blue));
+  background: linear-gradient(
+    135deg,
+    var(--color-deep-blue),
+    var(--color-primary-blue)
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -855,8 +913,16 @@
   flex-shrink: 0;
 }
 
-.el-avatar--lg { width: 56px; height: 56px; font-size: var(--text-lg); }
-.el-avatar--xl { width: 80px; height: 80px; font-size: var(--text-2xl); }
+.el-avatar--lg {
+  width: 56px;
+  height: 56px;
+  font-size: var(--text-lg);
+}
+.el-avatar--xl {
+  width: 80px;
+  height: 80px;
+  font-size: var(--text-2xl);
+}
 
 /* ── Divider ───────────────────────────────────────────────── */
 .el-divider {
@@ -883,7 +949,12 @@
 
 .el-progress__fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-deep-blue), var(--color-primary-blue), var(--color-light-blue));
+  background: linear-gradient(
+    90deg,
+    var(--color-deep-blue),
+    var(--color-primary-blue),
+    var(--color-light-blue)
+  );
   border-radius: var(--radius-full);
   transition: width var(--duration-slow) var(--ease-out);
   box-shadow: 0 0 8px rgba(52, 155, 212, 0.4);

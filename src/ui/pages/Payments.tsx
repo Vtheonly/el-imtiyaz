@@ -1,550 +1,396 @@
-/**
- * Payments — list & record payment page.
- *
- * Extended (2026-06) with a "Ledger View" toggle that switches the table
- * to the Excel-style master ledger (ETAT 20262027 equivalent), showing
- * the three Excel-computed columns: DEVIS ANNUEL (L), TOTAL VERSEMENTS (P),
- * and TOTAL*CREANCE (Q). Also includes a "Recompute" button that re-runs
- * every active formula rule across the ledger — equivalent to pressing
- * F9 in Excel.
- *
- * No new tabs are created; the new controls live at the top of the
- * existing Payments page header.
- */
-
-import { useEffect, useState } from 'react';
-import { Plus, Search, Download, RefreshCw, BookOpen, FileSpreadsheet, Calculator } from 'lucide-react';
-import { Card, Badge, Button, EmptyState, StatBlock } from '../components/common';
-import { PageHeader } from '../components/common/PageHeader';
-import { DataGrid, Column } from '../components/data/DataGrid';
-import { Modal } from '../components/common/Modal';
-import { formatDZD, formatDateTime } from '@shared/currency';
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
-  PAYMENT_STATUS_COLORS, PAYMENT_STATUS_LABELS, PaymentStatus,
-  PAYMENT_METHOD_LABELS
-} from '@core/enums';
-
-interface PaymentRow {
-  id: string;
-  receiptNumber: string;
-  studentId: string;
-  amount: number;
-  paymentDate: string;
-  paymentMethod: string;
-  status: PaymentStatus;
-}
+  Search,
+  Download,
+  RefreshCw,
+  BookOpen,
+  FileSpreadsheet,
+  Plus,
+} from "lucide-react";
+import { Card, Button, StatBlock, EmptyState } from "../components/common";
+import { PageHeader } from "../components/common/PageHeader";
+import { DataGrid, Column } from "../components/data/DataGrid";
+import { LedgerFormSlider } from "../components/forms/LedgerFormSlider";
+import { formatDZD } from "@shared/currency";
+import toast from "react-hot-toast";
 
 interface LedgerRow {
   id: string;
   studentName: string;
-  classCode?: string;
-  level?: string;
+  level: string;
+  classCode: string;
+  optionCode: string;
   remise: number;
+  justification: string;
   devisAnnuel: number;
   totalVersements: number;
   totalCreance: number;
   grandTotal: number;
-  sourceRow?: number;
+  fi: number;
+  v2: number;
+  altV2: number;
+  v3: number;
+  destination: string;
+  t1: number;
+  t2: number;
+  t3: number;
+  psy1: number;
+  psy2: number;
+  orth1: number;
+  orth2: number;
+  ePlant: number;
+  ratrapage: number;
+  september: number;
+  december: number;
+  march: number;
+  septemberBalance: number;
+  infos: string;
+  createdAt: string;
 }
 
-type ViewMode = 'payments' | 'ledger';
-
 export function Payments() {
-  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [viewMode, setViewMode] = useState<"payments" | "ledger">("ledger");
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('payments');
+  const [search, setSearch] = useState("");
   const [recomputing, setRecomputing] = useState(false);
-  const [summary, setSummary] = useState({
-    today: 0, thisMonth: 0, count: 0, outstanding: 0
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+
+  // Sliding Data State
+  const [formValues, setFormValues] = useState({
+    studentName: "",
+    level: "PRIM",
+    classCode: "",
+    optionCode: "",
+    remise: "0",
+    justification: "",
+    fi: "25000",
+    v2: "0",
+    altV2: "0",
+    v3: "0",
+    destination: "",
+    t1: "0",
+    t2: "0",
+    t3: "0",
+    psy1: "0",
+    psy2: "0",
+    orth1: "0",
+    orth2: "0",
+    ePlant: "0",
+    ratrapage: "0",
+    september: "0",
+    december: "0",
+    march: "0",
+    septemberBalance: "0",
+    infos: "",
+    date: new Date().toISOString().slice(0, 10),
   });
-
-  const loadPayments = async () => {
-    setLoading(true);
-    try {
-      const [rows, debt] = await Promise.all([
-        window.elImtiyaz.payments.list({ pageSize: 200 }),
-        window.elImtiyaz.debt.summary()
-      ]);
-      const data = rows as any[];
-      setPayments(data.map((p) => ({
-        id: p.id.value,
-        receiptNumber: p.receiptNumber,
-        studentId: p.studentId,
-        amount: p.amount,
-        paymentDate: p.paymentDate,
-        paymentMethod: p.paymentMethod,
-        status: p.status
-      })));
-
-      const today = new Date().toISOString().slice(0, 10);
-      const thisMonth = new Date().toISOString().slice(0, 7);
-      setSummary({
-        today: data.filter((p) => p.paymentDate.slice(0, 10) === today).reduce((s, p) => s + p.amount, 0),
-        thisMonth: data.filter((p) => p.paymentDate.slice(0, 7) === thisMonth).reduce((s, p) => s + p.amount, 0),
-        count: data.length,
-        outstanding: (debt as any).totalOutstanding
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadLedger = async () => {
     setLoading(true);
     try {
-      const rows = (await window.elImtiyaz.ledger.list({ pageSize: 1000 })) as any[];
-      setLedger(rows.map((e) => ({
-        id: e.id.value,
-        studentName: e.studentName,
-        classCode: e.classCode,
-        level: e.level,
-        remise: e.remise,
-        devisAnnuel: e.devisAnnuel,
-        totalVersements: e.totalVersements,
-        totalCreance: e.totalCreance,
-        grandTotal: e.grandTotal,
-        sourceRow: e.sourceRow,
-      })));
+      const rows = await window.elImtiyaz.ledger.list({ pageSize: 1000 });
+      setLedger(
+        (rows as any[]).map((e) => ({
+          id: e.id.value || e.id,
+          studentName: e.studentName,
+          level: e.level,
+          classCode: e.classCode,
+          optionCode: e.optionCode,
+          remise: e.remise,
+          justification: e.justification || "",
+          devisAnnuel: e.devisAnnuel,
+          totalVersements: e.totalVersements,
+          totalCreance: e.totalCreance,
+          grandTotal: e.grandTotal,
+          fi: e.fi,
+          v2: e.v2,
+          altV2: e.altV2,
+          v3: e.v3,
+          destination: e.destination || "",
+          t1: e.t1,
+          t2: e.t2,
+          t3: e.t3,
+          psy1: e.psy1,
+          psy2: e.psy2,
+          orth1: e.orth1,
+          orth2: e.orth2,
+          ePlant: e.ePlant,
+          ratrapage: e.ratrapage,
+          september: e.september,
+          december: e.december,
+          march: e.march,
+          septemberBalance: e.septemberBalance || 0,
+          infos: e.infos || "",
+          createdAt: e.createdAt,
+        })),
+      );
+    } catch {
+      toast.error("Failed to load school ledger rows.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (viewMode === 'payments') {
-      loadPayments();
-    } else {
-      loadLedger();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode]);
+    loadLedger();
+  }, []);
 
-  const handleRecompute = async () => {
-    setRecomputing(true);
+  const handleFormChange = (key: string, value: string) => {
+    setFormValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleClearForm = () => {
+    setEditingEntryId(null);
+    setFormValues({
+      studentName: "",
+      level: "PRIM",
+      classCode: "",
+      optionCode: "",
+      remise: "0",
+      justification: "",
+      fi: "25000",
+      v2: "0",
+      altV2: "0",
+      v3: "0",
+      destination: "",
+      t1: "0",
+      t2: "0",
+      t3: "0",
+      psy1: "0",
+      psy2: "0",
+      orth1: "0",
+      orth2: "0",
+      ePlant: "0",
+      ratrapage: "0",
+      september: "0",
+      december: "0",
+      march: "0",
+      septemberBalance: "0",
+      infos: "",
+      date: new Date().toISOString().slice(0, 10),
+    });
+  };
+
+  const handleSave = async () => {
+    if (!formValues.studentName.trim()) {
+      toast.error("Pupil name cannot be empty.");
+      return;
+    }
+    const payload = {
+      ...formValues,
+      remise: parseFloat(formValues.remise) || 0,
+      fi: parseFloat(formValues.fi) || 0,
+      v2: parseFloat(formValues.v2) || 0,
+      altV2: parseFloat(formValues.altV2) || 0,
+      v3: parseFloat(formValues.v3) || 0,
+      t1: parseFloat(formValues.t1) || 0,
+      t2: parseFloat(formValues.t2) || 0,
+      t3: parseFloat(formValues.t3) || 0,
+      psy1: parseFloat(formValues.psy1) || 0,
+      psy2: parseFloat(formValues.psy2) || 0,
+      orth1: parseFloat(formValues.orth1) || 0,
+      orth2: parseFloat(formValues.orth2) || 0,
+      ePlant: parseFloat(formValues.ePlant) || 0,
+      ratrapage: parseFloat(formValues.ratrapage) || 0,
+      september: parseFloat(formValues.september) || 0,
+      december: parseFloat(formValues.december) || 0,
+      march: parseFloat(formValues.march) || 0,
+      septemberBalance: parseFloat(formValues.septemberBalance) || 0,
+    };
+
     try {
-      const result = await window.elImtiyaz.ledger.recompute();
-      const r = result as any;
-      alert(`Recomputed ${r.recomputed} ledger entries (${r.skipped} skipped, ${r.errors?.length ?? 0} errors).`);
-      if (viewMode === 'ledger') await loadLedger();
+      if (editingEntryId) {
+        await window.elImtiyaz.ledger.update(editingEntryId, payload);
+        toast.success("Successfully updated entry.");
+      } else {
+        await window.elImtiyaz.ledger.create(payload as any);
+        toast.success("Added student to the master ledger.");
+      }
+      handleClearForm();
+      loadLedger();
     } catch (err) {
-      alert(`Recompute failed: ${(err as Error).message}`);
-    } finally {
-      setRecomputing(false);
+      toast.error(`Error saving: ${(err as Error).message}`);
     }
   };
 
-  const paymentColumns: Column<PaymentRow>[] = [
-    {
-      key: 'receiptNumber',
-      header: 'Receipt',
-      width: 140,
-      sortable: true,
-      render: (row) => (
-        <span className="text-mono" style={{ color: 'var(--color-primary-blue)' }}>
-          {row.receiptNumber}
-        </span>
-      )
-    },
-    {
-      key: 'studentId',
-      header: 'Student',
-      render: (row) => (
-        <span style={{ color: 'var(--color-text-tertiary)' }}>
-          {row.studentId.slice(0, 8)}…
-        </span>
-      )
-    },
-    {
-      key: 'amount',
-      header: 'Amount',
-      width: 140,
-      align: 'right',
-      sortable: true,
-      render: (row) => (
-        <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--color-success)' }}>
-          {formatDZD(row.amount)}
-        </span>
-      )
-    },
-    {
-      key: 'paymentMethod',
-      header: 'Method',
-      width: 140,
-      render: (row) => PAYMENT_METHOD_LABELS[row.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? row.paymentMethod
-    },
-    {
-      key: 'paymentDate',
-      header: 'Date',
-      width: 180,
-      sortable: true,
-      render: (row) => formatDateTime(row.paymentDate)
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      width: 110,
-      render: (row) => (
-        <Badge color={PAYMENT_STATUS_COLORS[row.status]}>
-          {PAYMENT_STATUS_LABELS[row.status]}
-        </Badge>
-      )
-    }
-  ];
+  const handleEditRow = (row: LedgerRow) => {
+    setEditingEntryId(row.id);
+    setFormValues({
+      studentName: row.studentName,
+      level: row.level,
+      classCode: row.classCode,
+      optionCode: row.optionCode,
+      remise: String(row.remise),
+      justification: row.justification,
+      fi: String(row.fi),
+      v2: String(row.v2),
+      altV2: String(row.altV2),
+      v3: String(row.v3),
+      destination: row.destination,
+      t1: String(row.t1),
+      t2: String(row.t2),
+      t3: String(row.t3),
+      psy1: String(row.psy1),
+      psy2: String(row.psy2),
+      orth1: String(row.orth1),
+      orth2: String(row.orth2),
+      ePlant: String(row.ePlant),
+      ratrapage: String(row.ratrapage),
+      september: String(row.september),
+      december: String(row.december),
+      march: String(row.march),
+      septemberBalance: String(row.septemberBalance),
+      infos: row.infos,
+      date: row.createdAt?.slice(0, 10) || "",
+    });
+  };
 
-  // ── Excel-style ledger columns (mirrors ETAT 20262027 sheet) ──
-  const ledgerColumns: Column<LedgerRow>[] = [
+  const liveTotals = useMemo(() => {
+    const remise = parseFloat(formValues.remise) || 0;
+    const fi = parseFloat(formValues.fi) || 0;
+    const v2 = parseFloat(formValues.v2) || 0;
+    const altV2 = parseFloat(formValues.altV2) || 0;
+    const v3 = parseFloat(formValues.v3) || 0;
+    const t1 = parseFloat(formValues.t1) || 0;
+    const t2 = parseFloat(formValues.t2) || 0;
+    const t3 = parseFloat(formValues.t3) || 0;
+
+    const baseTuition = 205000;
+    const transportBase = formValues.optionCode === "TRNSP" ? 35000 : 0;
+    const devisAnnuel = fi + baseTuition + transportBase - remise;
+    const totalVersements = fi + v2 + altV2 + v3 + t1 + t2 + t3;
+
+    return {
+      devisAnnuel,
+      totalVersements,
+      totalCreance: devisAnnuel - totalVersements,
+      grandTotal:
+        totalVersements +
+        (parseFloat(formValues.psy1) || 0) +
+        (parseFloat(formValues.psy2) || 0) +
+        (parseFloat(formValues.orth1) || 0),
+    };
+  }, [formValues]);
+
+  const columns: Column<LedgerRow>[] = [
+    { key: "studentName", header: "NOM", sortable: true },
+    { key: "classCode", header: "H (Classe)", sortable: true, width: 80 },
     {
-      key: 'sourceRow',
-      header: 'Excel Row',
-      width: 90,
-      sortable: true,
-      render: (row) => row.sourceRow ? <span className="text-mono" style={{ color: 'var(--color-text-tertiary)' }}>{row.sourceRow}</span> : '—',
+      key: "devisAnnuel",
+      header: "L (Devis)",
+      align: "right",
+      render: (r) => formatDZD(r.devisAnnuel),
     },
     {
-      key: 'studentName',
-      header: 'NOM (col F)',
-      width: 200,
-      sortable: true,
-      render: (row) => <span style={{ fontWeight: 'var(--weight-medium)' }}>{row.studentName}</span>,
+      key: "totalVersements",
+      header: "P (Versements)",
+      align: "right",
+      render: (r) => formatDZD(r.totalVersements),
     },
     {
-      key: 'level',
-      header: 'niveau (col G)',
-      width: 90,
-      render: (row) => row.level ? <Badge color="info">{row.level}</Badge> : '—',
+      key: "totalCreance",
+      header: "Q (Creance)",
+      align: "right",
+      render: (r) => formatDZD(r.totalCreance),
     },
     {
-      key: 'classCode',
-      header: 'CLASSE (col H)',
-      width: 110,
-      render: (row) => row.classCode ?? '—',
-    },
-    {
-      key: 'remise',
-      header: 'REMISE (col J)',
-      width: 130,
-      align: 'right',
-      sortable: true,
-      render: (row) => row.remise > 0 ? <span style={{ color: 'var(--color-warning)' }}>-{formatDZD(row.remise)}</span> : '—',
-    },
-    {
-      key: 'devisAnnuel',
-      header: 'DEVIS ANNUEL (col L)',
-      width: 180,
-      align: 'right',
-      sortable: true,
-      render: (row) => <span style={{ fontWeight: 'var(--weight-semibold)' }}>{formatDZD(row.devisAnnuel)}</span>,
-    },
-    {
-      key: 'totalVersements',
-      header: 'TOTAL VERSEMENTS (col P)',
-      width: 200,
-      align: 'right',
-      sortable: true,
-      render: (row) => <span style={{ color: 'var(--color-success)' }}>{formatDZD(row.totalVersements)}</span>,
-    },
-    {
-      key: 'totalCreance',
-      header: 'TOTAL*CREANCE (col Q)',
-      width: 190,
-      align: 'right',
-      sortable: true,
-      render: (row) => (
-        <span style={{
-          fontWeight: 'var(--weight-semibold)',
-          color: row.totalCreance > 0 ? 'var(--color-danger)' : 'var(--color-text-tertiary)'
-        }}>
-          {formatDZD(row.totalCreance)}
-        </span>
+      key: "actions",
+      header: "",
+      width: 120,
+      render: (r) => (
+        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="ghost" onClick={() => handleEditRow(r)}>
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={async () => {
+              if (confirm("Delete row?")) {
+                await window.elImtiyaz.ledger.delete(r.id);
+                loadLedger();
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </div>
       ),
     },
-    {
-      key: 'grandTotal',
-      header: 'TOTAL (col AL)',
-      width: 150,
-      align: 'right',
-      sortable: true,
-      render: (row) => <span style={{ color: 'var(--color-text-secondary)' }}>{formatDZD(row.grandTotal)}</span>,
-    },
   ];
-
-  // Compute Excel-style aggregate KPIs when in ledger view.
-  const ledgerKpis = ledger.reduce(
-    (acc, r) => ({
-      devisAnnuel: acc.devisAnnuel + r.devisAnnuel,
-      versements: acc.versements + r.totalVersements,
-      creance: acc.creance + r.totalCreance,
-      count: acc.count + 1,
-    }),
-    { devisAnnuel: 0, versements: 0, creance: 0, count: 0 }
-  );
 
   return (
     <div className="el-page">
       <PageHeader
-        title="Payments"
-        subtitle={viewMode === 'payments'
-          ? `${payments.length} payments recorded`
-          : `${ledger.length} ledger entries (Excel ETAT view)`}
+        title="Ledger Management"
+        subtitle={`${ledger.length} active logs`}
         actions={
-          <>
-            {/* View-mode toggle (no new tabs — switch in place) */}
-            <div className="el-segmented" role="tablist" aria-label="View mode" style={{
-              display: 'inline-flex',
-              background: 'var(--color-surface-2, #2a2b2c)',
-              borderRadius: 6,
-              padding: 2,
-              gap: 2,
-            }}>
-              <button
-                role="tab"
-                aria-selected={viewMode === 'payments'}
-                onClick={() => setViewMode('payments')}
-                style={{
-                  padding: '6px 12px',
-                  border: 'none',
-                  background: viewMode === 'payments' ? 'var(--color-primary-blue)' : 'transparent',
-                  color: viewMode === 'payments' ? '#fff' : 'var(--color-text-secondary)',
-                  borderRadius: 4,
-                  fontSize: 'var(--text-sm)',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <FileSpreadsheet size={13} /> Payments
-              </button>
-              <button
-                role="tab"
-                aria-selected={viewMode === 'ledger'}
-                onClick={() => setViewMode('ledger')}
-                style={{
-                  padding: '6px 12px',
-                  border: 'none',
-                  background: viewMode === 'ledger' ? 'var(--color-primary-blue)' : 'transparent',
-                  color: viewMode === 'ledger' ? '#fff' : 'var(--color-text-secondary)',
-                  borderRadius: 4,
-                  fontSize: 'var(--text-sm)',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <BookOpen size={13} /> Ledger (Excel)
-              </button>
-            </div>
-
-            {viewMode === 'ledger' && (
-              <Button
-                variant="ghost"
-                icon={<RefreshCw size={14} className={recomputing ? 'el-spin' : ''} />}
-                onClick={handleRecompute}
-                disabled={recomputing}
-              >
-                {recomputing ? 'Recomputing…' : 'Recompute (F9)'}
-              </Button>
-            )}
-
-            <Button variant="ghost" icon={<Download size={14} />} onClick={() => window.elImtiyaz.reports.export('revenue')}>
-              Export
-            </Button>
-            <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowNewModal(true)}>
-              Record Payment
-            </Button>
-          </>
+          <Button
+            variant="ghost"
+            icon={<RefreshCw size={14} />}
+            onClick={loadLedger}
+          >
+            Refresh
+          </Button>
         }
       />
 
-      {/* KPIs — switch by view */}
-      {viewMode === 'payments' ? (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-          <StatBlock label="Today's Revenue" value={summary.today} format="currency" />
-          <StatBlock label="This Month" value={summary.thisMonth} format="currency" />
-          <StatBlock label="Total Payments" value={summary.count} format="number" />
-          <StatBlock label="Outstanding Debt" value={summary.outstanding} format="currency" />
-        </div>
-      ) : (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-          <StatBlock label="Ledger Entries" value={ledgerKpis.count} format="number" />
-          <StatBlock label="Σ DEVIS ANNUEL (col L)" value={ledgerKpis.devisAnnuel} format="currency" />
-          <StatBlock label="Σ TOTAL VERSEMENTS (col P)" value={ledgerKpis.versements} format="currency" />
-          <StatBlock label="Σ TOTAL*CREANCE (col Q)" value={ledgerKpis.creance} format="currency" />
-        </div>
-      )}
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: "1.2fr 2fr",
+          gap: "var(--space-4)",
+          marginBottom: "var(--space-4)",
+        }}
+      >
+        <LedgerFormSlider
+          liveTotals={liveTotals}
+          onValueChange={handleFormChange}
+          onClear={handleClearForm}
+          onSave={handleSave}
+          values={formValues}
+        />
+        <Card title="Recalculated System Summaries">
+          <div
+            className="grid"
+            style={{ gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}
+          >
+            <StatBlock
+              label="Active Pupil Count"
+              value={ledger.length}
+              format="number"
+            />
+            <StatBlock
+              label="Outstanding Balance"
+              value={ledger.reduce((acc, row) => acc + row.totalCreance, 0)}
+              format="currency"
+            />
+          </div>
+        </Card>
+      </div>
 
       <Card>
-        <div className="flex items-center gap-3" style={{ marginBottom: 'var(--space-4)' }}>
-          <div className="el-search-bar" style={{ flex: 1, maxWidth: 400 }}>
-            <Search size={14} style={{ color: 'var(--color-text-tertiary)' }} />
-            <input
-              placeholder={viewMode === 'payments' ? 'Search by receipt number…' : 'Search by student name…'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          {viewMode === 'ledger' && (
-            <div className="flex items-center gap-2" style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-xs)' }}>
-              <Calculator size={12} />
-              <span>Excel columns L, P, Q are auto-computed via Formula Rules</span>
-            </div>
+        <div
+          className="el-search-bar"
+          style={{ marginBottom: "var(--space-3)" }}
+        >
+          <Search size={14} />
+          <input
+            placeholder="Fuzzy find pupil or class…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <DataGrid
+          columns={columns}
+          data={ledger.filter((r) =>
+            r.studentName?.toLowerCase().includes(search.toLowerCase()),
           )}
-        </div>
-
-        {viewMode === 'payments' ? (
-          <DataGrid
-            columns={paymentColumns}
-            data={payments.filter((p) =>
-              !search || p.receiptNumber.toLowerCase().includes(search.toLowerCase())
-            )}
-            rowKey={(row) => row.id}
-            loading={loading}
-            sortField="paymentDate"
-            sortDir="desc"
-            emptyState={
-              <EmptyState
-                icon={<Search size={24} />}
-                title="No payments found"
-                description="Record your first payment to see it here."
-              />
-            }
-          />
-        ) : (
-          <DataGrid
-            columns={ledgerColumns}
-            data={ledger.filter((r) =>
-              !search || r.studentName.toLowerCase().includes(search.toLowerCase())
-            )}
-            rowKey={(row) => row.id}
-            loading={loading}
-            sortField="studentName"
-            sortDir="asc"
-            emptyState={
-              <EmptyState
-                icon={<BookOpen size={24} />}
-                title="No ledger entries yet"
-                description="Import a spreadsheet or create ledger entries via workflows to see the Excel-style master ledger here."
-              />
-            }
-          />
-        )}
+          rowKey={(r) => r.id}
+          loading={loading}
+        />
       </Card>
-
-      <NewPaymentModal open={showNewModal} onClose={() => setShowNewModal(false)} onSaved={loadPayments} />
     </div>
-  );
-}
-
-function NewPaymentModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
-  const [studentId, setStudentId] = useState('');
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('cash');
-  const [reference, setReference] = useState('');
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async () => {
-    setSaving(true);
-    try {
-      await window.elImtiyaz.payments.create({
-        studentId,
-        amount: parseFloat(amount),
-        paymentMethod: method,
-        reference: reference || undefined,
-        notes: notes || undefined
-      });
-      onSaved();
-      onClose();
-      // Reset form
-      setStudentId(''); setAmount(''); setMethod('cash'); setReference(''); setNotes('');
-    } catch (err) {
-      alert(`Failed to record payment: ${(err as Error).message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Record Payment"
-      size="md"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={saving || !studentId || !amount}>
-            {saving ? 'Saving…' : 'Record Payment'}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <div>
-          <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Student ID</label>
-          <input
-            className="el-input"
-            style={{ width: '100%' }}
-            placeholder="e.g. abcd-1234-…"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-          />
-        </div>
-
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-          <div>
-            <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Amount (DZD)</label>
-            <input
-              type="number"
-              className="el-input"
-              style={{ width: '100%' }}
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Method</label>
-            <div className="el-select" style={{ width: '100%' }}>
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-                style={{ width: '100%' }}
-              >
-                {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Reference (optional)</label>
-          <input
-            className="el-input"
-            style={{ width: '100%' }}
-            placeholder="Cheque #, transfer ID, etc."
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="el-stat__label" style={{ display: 'block', marginBottom: 6 }}>Notes</label>
-          <textarea
-            className="el-input"
-            style={{ width: '100%', minHeight: 60, resize: 'vertical' }}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-      </div>
-    </Modal>
   );
 }

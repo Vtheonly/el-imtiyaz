@@ -7,12 +7,18 @@
  *  - Enforces security defaults (no nodeIntegration, contextBridge only).
  */
 
-import { BrowserWindow, shell, BrowserWindowConstructorOptions } from 'electron';
-import { logger } from '../infrastructure/logger/logger';
-import { AppPaths } from './system/app-paths';
+import {
+  BrowserWindow,
+  shell,
+  BrowserWindowConstructorOptions,
+} from "electron";
+import { logger } from "../infrastructure/logger/logger";
+import { AppPaths } from "./system/app-paths";
 
-const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL;
-const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
+const isDev =
+  process.env.NODE_ENV === "development" || !!process.env.VITE_DEV_SERVER_URL;
+const DEV_SERVER_URL =
+  process.env.VITE_DEV_SERVER_URL ?? "http://localhost:5173";
 
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null;
@@ -27,18 +33,18 @@ export class WindowManager {
       minWidth: 1024,
       minHeight: 680,
       show: false,
-      backgroundColor: '#242526',
-      title: 'El-Imtiyaz School System',
-      autoHideMenuBar: true,
-      titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+      backgroundColor: "#242526",
+      title: "El-Imtiyaz School System",
+      autoHideMenuBar: false, // Ensure native window menu bar is visible to trigger devTools
+      titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
       webPreferences: {
         preload: preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: false,
         spellcheck: false,
-        devTools: isDev
-      }
+        devTools: true, // FORCE ENABLE DEVTOOLS IN ALL ENVIRONMENTS FOR TESTING
+      },
     };
 
     this.mainWindow = new BrowserWindow(options);
@@ -46,25 +52,46 @@ export class WindowManager {
     // Open external links in the OS default browser, never inside the app.
     this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
-      return { action: 'deny' };
+      return { action: "deny" };
+    });
+
+    // Force Open Developer Tools immediately upon creation
+    this.mainWindow.webContents.once("did-frame-finish-load", () => {
+      this.mainWindow?.webContents.openDevTools({ mode: "detach" });
+    });
+
+    // Register global shortcut listeners directly on this window for inspect keys
+    this.mainWindow.webContents.on("before-input-event", (event, input) => {
+      // Toggle DevTools on F12 or CmdOrCtrl+Shift+I
+      if (
+        input.key === "F12" ||
+        (input.control && input.shift && input.key.toLowerCase() === "i") ||
+        (input.meta && input.shift && input.key.toLowerCase() === "i")
+      ) {
+        if (this.mainWindow?.webContents.isDevToolsOpened()) {
+          this.mainWindow.webContents.closeDevTools();
+        } else {
+          this.mainWindow?.webContents.openDevTools({ mode: "detach" });
+        }
+        event.preventDefault();
+      }
     });
 
     // Show only once the renderer is ready (prevents white flash).
-    this.mainWindow.once('ready-to-show', () => {
+    this.mainWindow.once("ready-to-show", () => {
       this.mainWindow?.show();
-      logger.info('window.main.shown');
+      logger.info("window.main.shown");
     });
 
     // Track window close for cleanup.
-    this.mainWindow.on('closed', () => {
+    this.mainWindow.on("closed", () => {
       this.mainWindow = null;
-      logger.info('window.main.closed');
+      logger.info("window.main.closed");
     });
 
     // Load the renderer.
     if (isDev) {
       await this.mainWindow.loadURL(DEV_SERVER_URL);
-      this.mainWindow.webContents.openDevTools({ mode: 'detach' });
     } else {
       await this.mainWindow.loadFile(AppPaths.resolve().rendererIndex);
     }

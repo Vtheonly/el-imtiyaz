@@ -1,48 +1,14 @@
 /**
- * Formula Engine — a safe, sandboxed expression evaluator for Excel-like
- * formulas.
+ * Formula Engine — a safe, sandboxed expression evaluator for Excel-like formulas.
  *
  * Design goals:
- *   - Reproduce the *category* of formulas found in the Suivis clients.xlsx
- *     workbook (arithmetic, IF, SUM, VLOOKUP-style field lookups).
- *   - Be safe to evaluate on untrusted user input — no `eval`, no `Function`
- *     constructor, no filesystem or network access.
- *   - Be fully traceable: every evaluation produces an AST that can be
- *     rendered back to the user for debugging.
- *   - Be extensible: new functions (SUMIF, XLOOKUP, etc.) can be added by
- *     registering them in the FUNCTION_TABLE.
- *
- * Grammar (informal):
- *   expression := orExpr
- *   orExpr     := andExpr ( "OR"  andExpr )*
- *   andExpr    := notExpr ( "AND" notExpr )*
- *   notExpr    := "NOT"? cmpExpr
- *   cmpExpr    := addExpr ( ("=" | "<>" | "<" | ">" | "<=" | ">=") addExpr )?
- *   addExpr    := mulExpr ( ("+" | "-") mulExpr )*
- *   mulExpr    := unary    ( ("*" | "/" | "%") unary )*
- *   unary      := ("+" | "-")? primary
- *   primary    := number | string | boolean | "(" expression ")"
- *               | ident ( "(" argList? ")" )?            // function call or field ref
- *               | "[" ident "]"                            // explicit field ref
- *   argList    := expression ( "," expression )*
- *
- * Tokens:
- *   - Numbers:    123, 123.45, 1e5
- *   - Strings:    "hello", 'hello' (single-quoted)
- *   - Booleans:   TRUE, FALSE (case-insensitive)
- *   - Identifiers: [A-Za-z_][A-Za-z0-9_]*   (case-insensitive function names)
- *   - Operators:  + - * / % = <> < > <= >=
- *   - Punctuation: ( ) , [ ]
- *
- * Field resolution:
- *   A bare identifier (not followed by `(`) is resolved against the
- *   evaluation context's `fields` map. Nested paths are supported via
- *   dot notation: `lineItems.fraisScolaireAmount`.
+ *   - Reproduce the formulas found in the Suivis clients.xlsx workbook.
+ *   - Safe to evaluate on untrusted user input — no eval, no Function constructor.
+ *   - Fully traceable: every evaluation produces an AST.
  */
 
 import { logger } from "../../infrastructure/logger/logger";
 
-// ── AST node types ─────────────────────────────────────────────
 export type AstNode =
   | { type: "num"; value: number }
   | { type: "str"; value: string }
@@ -53,12 +19,32 @@ export type AstNode =
   | { type: "call"; fn: string; args: AstNode[] };
 
 export type BinaryOp =
-  | "+" | "-" | "*" | "/" | "%"
-  | "=" | "<>" | "<" | ">" | "<=" | ">="
-  | "AND" | "OR";
+  | "+"
+  | "-"
+  | "*"
+  | "/"
+  | "%"
+  | "="
+  | "<>"
+  | "<"
+  | ">"
+  | "<="
+  | ">="
+  | "AND"
+  | "OR";
 
-// ── Tokens ─────────────────────────────────────────────────────
-type TokenType = "num" | "str" | "bool" | "ident" | "op" | "lparen" | "rparen" | "comma" | "lbracket" | "rbracket" | "eof";
+type TokenType =
+  | "num"
+  | "str"
+  | "bool"
+  | "ident"
+  | "op"
+  | "lparen"
+  | "rparen"
+  | "comma"
+  | "lbracket"
+  | "rbracket"
+  | "eof";
 
 interface Token {
   type: TokenType;
@@ -66,42 +52,47 @@ interface Token {
   pos: number;
 }
 
-// ── Errors ─────────────────────────────────────────────────────
 export class FormulaSyntaxError extends Error {
-  constructor(message: string, public pos: number) {
+  constructor(
+    message: string,
+    public pos: number,
+  ) {
     super(message);
     this.name = "FormulaSyntaxError";
   }
 }
 
 export class FormulaRuntimeError extends Error {
-  constructor(message: string, public expression: string) {
+  constructor(
+    message: string,
+    public expression: string,
+  ) {
     super(message);
     this.name = "FormulaRuntimeError";
   }
 }
 
-// ── Tokeniser ──────────────────────────────────────────────────
 function tokenize(src: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   const n = src.length;
 
   const isDigit = (c: string) => c >= "0" && c <= "9";
-  const isAlpha = (c: string) => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_";
+  const isAlpha = (c: string) =>
+    (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_";
   const isAlphaNum = (c: string) => isAlpha(c) || isDigit(c);
 
   while (i < n) {
     const c = src[i];
 
-    // Whitespace
-    if (/\s/.test(c)) { i++; continue; }
+    if (/\s/.test(c)) {
+      i++;
+      continue;
+    }
 
-    // Number — supports decimals and scientific notation
     if (isDigit(c) || (c === "." && isDigit(src[i + 1]))) {
       let j = i;
       while (j < n && (isDigit(src[j]) || src[j] === ".")) j++;
-      // scientific notation
       if (j < n && (src[j] === "e" || src[j] === "E")) {
         j++;
         if (src[j] === "+" || src[j] === "-") j++;
@@ -112,7 +103,6 @@ function tokenize(src: string): Token[] {
       continue;
     }
 
-    // String (double or single quoted)
     if (c === '"' || c === "'") {
       const quote = c;
       let j = i + 1;
@@ -126,13 +116,13 @@ function tokenize(src: string): Token[] {
           j++;
         }
       }
-      if (j >= n) throw new FormulaSyntaxError(`Unterminated string starting at ${i}`, i);
+      if (j >= n)
+        throw new FormulaSyntaxError(`Unterminated string starting at ${i}`, i);
       tokens.push({ type: "str", value, pos: i });
       i = j + 1;
       continue;
     }
 
-    // Identifier / boolean / function name
     if (isAlpha(c)) {
       let j = i;
       while (j < n && isAlphaNum(src[j])) j++;
@@ -147,16 +137,32 @@ function tokenize(src: string): Token[] {
       continue;
     }
 
-    // Brackets [field]
-    if (c === "[") { tokens.push({ type: "lbracket", value: c, pos: i }); i++; continue; }
-    if (c === "]") { tokens.push({ type: "rbracket", value: c, pos: i }); i++; continue; }
+    if (c === "[") {
+      tokens.push({ type: "lbracket", value: c, pos: i });
+      i++;
+      continue;
+    }
+    if (c === "]") {
+      tokens.push({ type: "rbracket", value: c, pos: i });
+      i++;
+      continue;
+    }
+    if (c === "(") {
+      tokens.push({ type: "lparen", value: c, pos: i });
+      i++;
+      continue;
+    }
+    if (c === ")") {
+      tokens.push({ type: "rparen", value: c, pos: i });
+      i++;
+      continue;
+    }
+    if (c === ",") {
+      tokens.push({ type: "comma", value: c, pos: i });
+      i++;
+      continue;
+    }
 
-    // Parens / comma
-    if (c === "(") { tokens.push({ type: "lparen", value: c, pos: i }); i++; continue; }
-    if (c === ")") { tokens.push({ type: "rparen", value: c, pos: i }); i++; continue; }
-    if (c === ",") { tokens.push({ type: "comma", value: c, pos: i }); i++; continue; }
-
-    // Operators (two-char first)
     const two = src.slice(i, i + 2);
     if (two === "<>" || two === "<=" || two === ">=") {
       tokens.push({ type: "op", value: two, pos: i });
@@ -176,20 +182,23 @@ function tokenize(src: string): Token[] {
   return tokens;
 }
 
-// ── Parser (recursive descent) ─────────────────────────────────
 class Parser {
   private pos = 0;
   constructor(private readonly tokens: Token[]) {}
 
-  private peek(): Token { return this.tokens[this.pos]; }
-  private next(): Token { return this.tokens[this.pos++]; }
+  private peek(): Token {
+    return this.tokens[this.pos];
+  }
+  private next(): Token {
+    return this.tokens[this.pos++];
+  }
 
   private expect(type: TokenType, value?: string): Token {
     const t = this.peek();
     if (t.type !== type || (value !== undefined && t.value !== value)) {
       throw new FormulaSyntaxError(
         `Expected ${value ?? type} but got ${t.value || t.type} at ${t.pos}`,
-        t.pos
+        t.pos,
       );
     }
     return this.next();
@@ -198,14 +207,20 @@ class Parser {
   parse(): AstNode {
     const node = this.parseOr();
     if (this.peek().type !== "eof") {
-      throw new FormulaSyntaxError(`Unexpected token ${this.peek().value} at ${this.peek().pos}`, this.peek().pos);
+      throw new FormulaSyntaxError(
+        `Unexpected token ${this.peek().value} at ${this.peek().pos}`,
+        this.peek().pos,
+      );
     }
     return node;
   }
 
   private parseOr(): AstNode {
     let left = this.parseAnd();
-    while (this.peek().type === "ident" && this.peek().value.toUpperCase() === "OR") {
+    while (
+      this.peek().type === "ident" &&
+      this.peek().value.toUpperCase() === "OR"
+    ) {
       this.next();
       const right = this.parseAnd();
       left = { type: "binary", op: "OR", left, right };
@@ -215,7 +230,10 @@ class Parser {
 
   private parseAnd(): AstNode {
     let left = this.parseNot();
-    while (this.peek().type === "ident" && this.peek().value.toUpperCase() === "AND") {
+    while (
+      this.peek().type === "ident" &&
+      this.peek().value.toUpperCase() === "AND"
+    ) {
       this.next();
       const right = this.parseNot();
       left = { type: "binary", op: "AND", left, right };
@@ -224,11 +242,17 @@ class Parser {
   }
 
   private parseNot(): AstNode {
-    if (this.peek().type === "ident" && this.peek().value.toUpperCase() === "NOT") {
+    if (
+      this.peek().type === "ident" &&
+      this.peek().value.toUpperCase() === "NOT"
+    ) {
       this.next();
       const operand = this.parseNot();
-      // NOT is implemented as a unary wrapper via 0/1 coercion
-      return { type: "unary", op: "-", operand: { type: "call", fn: "NOT", args: [operand] } };
+      return {
+        type: "unary",
+        op: "-",
+        operand: { type: "call", fn: "NOT", args: [operand] },
+      };
     }
     return this.parseCmp();
   }
@@ -236,7 +260,10 @@ class Parser {
   private parseCmp(): AstNode {
     const left = this.parseAdd();
     const t = this.peek();
-    if (t.type === "op" && ["=", "<>", "<", ">", "<=", ">="].includes(t.value)) {
+    if (
+      t.type === "op" &&
+      ["=", "<>", "<", ">", "<=", ">="].includes(t.value)
+    ) {
       this.next();
       const right = this.parseAdd();
       return { type: "binary", op: t.value as BinaryOp, left, right };
@@ -246,7 +273,10 @@ class Parser {
 
   private parseAdd(): AstNode {
     let left = this.parseMul();
-    while (this.peek().type === "op" && (this.peek().value === "+" || this.peek().value === "-")) {
+    while (
+      this.peek().type === "op" &&
+      (this.peek().value === "+" || this.peek().value === "-")
+    ) {
       const op = this.next().value as "+" | "-";
       const right = this.parseMul();
       left = { type: "binary", op, left, right };
@@ -256,7 +286,10 @@ class Parser {
 
   private parseMul(): AstNode {
     let left = this.parseUnary();
-    while (this.peek().type === "op" && ["*", "/", "%"].includes(this.peek().value)) {
+    while (
+      this.peek().type === "op" &&
+      ["*", "/", "%"].includes(this.peek().value)
+    ) {
       const op = this.next().value as BinaryOp;
       const right = this.parseUnary();
       left = { type: "binary", op, left, right };
@@ -298,13 +331,11 @@ class Parser {
     if (t.type === "lbracket") {
       this.next();
       const id = this.expect("ident").value;
-      // Allow nested identifiers separated by dots
       let path = id;
       while (this.peek().type === "op" && this.peek().value === ".") {
         this.next();
         path += "." + this.expect("ident").value;
       }
-      // Also allow field access via [a][b] style — concatenate
       while (this.peek().type === "lbracket") {
         this.next();
         const inner = this.expect("ident").value;
@@ -318,7 +349,6 @@ class Parser {
       this.next();
       const name = t.value;
 
-      // Function call?
       if (this.peek().type === "lparen") {
         this.next();
         const args: AstNode[] = [];
@@ -333,15 +363,12 @@ class Parser {
         return { type: "call", fn: name.toUpperCase(), args };
       }
 
-      // Bare identifier — treat as field path (may have dot notation)
       let path = name;
       while (this.peek().type === "op" && this.peek().value === ".") {
         this.next();
-        // The next identifier might be after a dot
         if (this.peek().type === "ident") {
           path += "." + this.next().value;
         } else if (this.peek().type === "lbracket") {
-          // arr.field syntax — extract via [name]
           this.next();
           path += "." + this.expect("ident").value;
           this.expect("rbracket");
@@ -350,23 +377,21 @@ class Parser {
       return { type: "field", path };
     }
 
-    throw new FormulaSyntaxError(`Unexpected token ${t.value || t.type} at ${t.pos}`, t.pos);
+    throw new FormulaSyntaxError(
+      `Unexpected token ${t.value || t.type} at ${t.pos}`,
+      t.pos,
+    );
   }
 }
 
-// ── Evaluation context ─────────────────────────────────────────
 export interface FormulaContext {
-  /** Field values accessible by name. Nested via dot notation. */
   fields: Record<string, unknown>;
-  /** Optional named ranges — arrays of records (for VLOOKUP/INDEX/MATCH). */
   ranges?: Record<string, Array<Record<string, unknown>>>;
 }
 
-// ── Built-in functions ─────────────────────────────────────────
 type FunctionImpl = (args: unknown[], ctx: FormulaContext) => unknown;
 
 const FUNCTION_TABLE: Record<string, FunctionImpl> = {
-  // ── Aggregations ───────────────────────────────────────────
   SUM: (args) => {
     let total = 0;
     for (const a of args) {
@@ -378,7 +403,8 @@ const FUNCTION_TABLE: Record<string, FunctionImpl> = {
     }
     return total;
   },
-  COUNT: (args) => args.filter((a) => a !== null && a !== undefined && a !== "").length,
+  COUNT: (args) =>
+    args.filter((a) => a !== null && a !== undefined && a !== "").length,
   AVG: (args) => {
     const nums = args.map(Number).filter((n) => !isNaN(n));
     return nums.length ? nums.reduce((s, n) => s + n, 0) / nums.length : 0;
@@ -398,13 +424,11 @@ const FUNCTION_TABLE: Record<string, FunctionImpl> = {
   INT: (args) => Math.floor(Number(args[0]) || 0),
   TRUNC: (args) => Math.trunc(Number(args[0]) || 0),
 
-  // ── Logic ──────────────────────────────────────────────────
   IF: (args) => {
     const cond = toBool(args[0]);
     return cond ? args[1] : (args[2] ?? false);
   },
   IFS: (args) => {
-    // IFS(cond1, val1, cond2, val2, ...)
     for (let i = 0; i < args.length; i += 2) {
       if (toBool(args[i])) return args[i + 1];
     }
@@ -413,24 +437,23 @@ const FUNCTION_TABLE: Record<string, FunctionImpl> = {
   AND: (args) => args.every(toBool),
   OR: (args) => args.some(toBool),
   NOT: (args) => !toBool(args[0]),
-  ISBLANK: (args) => args[0] === null || args[0] === undefined || args[0] === "",
-  ISNUMBER: (args) => typeof args[0] === "number" || (!isNaN(Number(args[0])) && args[0] !== ""),
-  ISEMPTY: (args) => args[0] === null || args[0] === undefined || args[0] === "",
+  ISBLANK: (args) =>
+    args[0] === null || args[0] === undefined || args[0] === "",
+  ISNUMBER: (args) =>
+    typeof args[0] === "number" || (!isNaN(Number(args[0])) && args[0] !== ""),
+  ISEMPTY: (args) =>
+    args[0] === null || args[0] === undefined || args[0] === "",
 
-  // ── Error handling ─────────────────────────────────────────
   IFERROR: (args) => {
-    // Note: args[0] has already been evaluated by the time we get here.
-    // True Excel IFERROR catches evaluation errors; our engine returns
-    // the alternative when the first arg is null/undefined/error-string.
     const v = args[0];
     if (v === null || v === undefined || v === "#ERROR" || v === "#REF!") {
       return args[1];
     }
     return v;
   },
-  ISERROR: (args) => args[0] === "#ERROR" || args[0] === "#REF!" || args[0] === null,
+  ISERROR: (args) =>
+    args[0] === "#ERROR" || args[0] === "#REF!" || args[0] === null,
 
-  // ── Text ───────────────────────────────────────────────────
   TEXT: (args) => String(args[0] ?? ""),
   CONCAT: (args) => args.map((a) => String(a ?? "")).join(""),
   CONCATENATE: (args) => FUNCTION_TABLE.CONCAT(args, { fields: {} }),
@@ -451,7 +474,6 @@ const FUNCTION_TABLE: Record<string, FunctionImpl> = {
   LOWER: (args) => String(args[0] ?? "").toLowerCase(),
   TRIM: (args) => String(args[0] ?? "").trim(),
 
-  // ── Date ───────────────────────────────────────────────────
   TODAY: () => new Date().toISOString().slice(0, 10),
   NOW: () => new Date().toISOString(),
   YEAR: (args) => new Date(String(args[0])).getFullYear(),
@@ -464,7 +486,6 @@ const FUNCTION_TABLE: Record<string, FunctionImpl> = {
     return new Date(y, m - 1, d).toISOString().slice(0, 10);
   },
 
-  // ── Lookups ────────────────────────────────────────────────
   VLOOKUP: (args, ctx) => {
     const lookup = args[0];
     const rangeName = String(args[1]);
@@ -474,7 +495,10 @@ const FUNCTION_TABLE: Record<string, FunctionImpl> = {
     for (const row of range) {
       const keys = Object.keys(row);
       if (keys.length === 0) continue;
-      if (row[keys[0]] === lookup || (!exactMatch && String(row[keys[0]]) === String(lookup))) {
+      if (
+        row[keys[0]] === lookup ||
+        (!exactMatch && String(row[keys[0]]) === String(lookup))
+      ) {
         return row[keys[colIndex]];
       }
     }
@@ -496,15 +520,17 @@ const FUNCTION_TABLE: Record<string, FunctionImpl> = {
     const range = ctx.ranges?.[rangeName] ?? [];
     for (let i = 0; i < range.length; i++) {
       const keys = Object.keys(range[i]);
-      if (range[i][keys[0]] === lookup || String(range[i][keys[0]]) === String(lookup)) {
-        return i + 1; // Excel MATCH is 1-indexed
+      if (
+        range[i][keys[0]] === lookup ||
+        String(range[i][keys[0]]) === String(lookup)
+      ) {
+        return i + 1;
       }
     }
     return "#N/A";
   },
 };
 
-// ── Evaluator ──────────────────────────────────────────────────
 function toBool(v: unknown): boolean {
   if (typeof v === "boolean") return v;
   if (typeof v === "number") return v !== 0;
@@ -530,7 +556,6 @@ function resolveField(path: string, ctx: FormulaContext): unknown {
     if (current === null || current === undefined) return undefined;
     if (typeof current !== "object") return undefined;
     if (Array.isArray(current)) {
-      // Map the field across the array (Excel-style implicit array)
       return current.map((item) => {
         if (item && typeof item === "object") {
           return (item as Record<string, unknown>)[p];
@@ -559,19 +584,27 @@ function evaluateAst(node: AstNode, ctx: FormulaContext): unknown {
       return node.op === "-" ? -n : n;
     }
     case "binary": {
-      // Short-circuit AND/OR
       if (node.op === "AND") {
-        return toBool(evaluateAst(node.left, ctx)) && toBool(evaluateAst(node.right, ctx));
+        return (
+          toBool(evaluateAst(node.left, ctx)) &&
+          toBool(evaluateAst(node.right, ctx))
+        );
       }
       if (node.op === "OR") {
-        return toBool(evaluateAst(node.left, ctx)) || toBool(evaluateAst(node.right, ctx));
+        return (
+          toBool(evaluateAst(node.left, ctx)) ||
+          toBool(evaluateAst(node.right, ctx))
+        );
       }
       const l = evaluateAst(node.left, ctx);
       const r = evaluateAst(node.right, ctx);
       switch (node.op) {
-        case "+": return toNum(l) + toNum(r);
-        case "-": return toNum(l) - toNum(r);
-        case "*": return toNum(l) * toNum(r);
+        case "+":
+          return toNum(l) + toNum(r);
+        case "-":
+          return toNum(l) - toNum(r);
+        case "*":
+          return toNum(l) * toNum(r);
         case "/": {
           const rn = toNum(r);
           if (rn === 0) throw new FormulaRuntimeError("Division by zero", "");
@@ -582,12 +615,28 @@ function evaluateAst(node: AstNode, ctx: FormulaContext): unknown {
           if (rn === 0) throw new FormulaRuntimeError("Modulo by zero", "");
           return toNum(l) % rn;
         }
-        case "=": return l === r || (typeof l === "number" || typeof r === "number" ? toNum(l) === toNum(r) : false);
-        case "<>": return l !== r && (typeof l === "number" || typeof r === "number" ? toNum(l) !== toNum(r) : true);
-        case "<": return toNum(l) < toNum(r);
-        case ">": return toNum(l) > toNum(r);
-        case "<=": return toNum(l) <= toNum(r);
-        case ">=": return toNum(l) >= toNum(r);
+        case "=":
+          return (
+            l === r ||
+            (typeof l === "number" || typeof r === "number"
+              ? toNum(l) === toNum(r)
+              : false)
+          );
+        case "<>":
+          return (
+            l !== r &&
+            (typeof l === "number" || typeof r === "number"
+              ? toNum(l) !== toNum(r)
+              : true)
+          );
+        case "<":
+          return toNum(l) < toNum(r);
+        case ">":
+          return toNum(l) > toNum(r);
+        case "<=":
+          return toNum(l) <= toNum(r);
+        case ">=":
+          return toNum(l) >= toNum(r);
       }
       throw new FormulaRuntimeError(`Unknown operator: ${node.op}`, "");
     }
@@ -602,21 +651,18 @@ function evaluateAst(node: AstNode, ctx: FormulaContext): unknown {
   }
 }
 
-// ── Public API ─────────────────────────────────────────────────
 export interface FormulaEvaluationResult {
   value: unknown;
   ast: AstNode;
   durationMs: number;
 }
 
-/**
- * Evaluate an expression against a context.
- * Throws FormulaSyntaxError or FormulaRuntimeError on failure.
- */
-export function evaluate(expression: string, ctx: FormulaContext): FormulaEvaluationResult {
+export function evaluate(
+  expression: string,
+  ctx: FormulaContext,
+): FormulaEvaluationResult {
   const start = Date.now();
   const trimmed = expression.trim();
-  // Strip leading "=" (Excel convention)
   const src = trimmed.startsWith("=") ? trimmed.slice(1) : trimmed;
 
   const tokens = tokenize(src);
@@ -627,21 +673,27 @@ export function evaluate(expression: string, ctx: FormulaContext): FormulaEvalua
   return { value, ast, durationMs: Date.now() - start };
 }
 
-/**
- * Safe evaluate — never throws. Returns `{ ok: true, value }` or
- * `{ ok: false, error }`. Logs the error for traceability.
- */
 export function safeEvaluate(
   expression: string,
   ctx: FormulaContext,
-  logPrefix = "formula"
-): { ok: true; value: unknown; ast?: AstNode; durationMs: number } | { ok: false; error: string } {
+  logPrefix = "formula",
+):
+  | { ok: true; value: unknown; ast?: AstNode; durationMs: number }
+  | { ok: false; error: string } {
   try {
     const result = evaluate(expression, ctx);
     if (result.durationMs > 50) {
-      logger.warn(`${logPrefix}.slow`, { expression, durationMs: result.durationMs });
+      logger.warn(`${logPrefix}.slow`, {
+        expression,
+        durationMs: result.durationMs,
+      });
     }
-    return { ok: true, value: result.value, ast: result.ast, durationMs: result.durationMs };
+    return {
+      ok: true,
+      value: result.value,
+      ast: result.ast,
+      durationMs: result.durationMs,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn(`${logPrefix}.error`, { expression, error: msg });
@@ -649,11 +701,9 @@ export function safeEvaluate(
   }
 }
 
-/**
- * Validate an expression (parse only — no evaluation). Useful for
- * live feedback in the formula editor.
- */
-export function validate(expression: string): { ok: true } | { ok: false; error: string; pos?: number } {
+export function validate(
+  expression: string,
+): { ok: true } | { ok: false; error: string; pos?: number } {
   try {
     const trimmed = expression.trim();
     const src = trimmed.startsWith("=") ? trimmed.slice(1) : trimmed;
@@ -669,17 +719,18 @@ export function validate(expression: string): { ok: true } | { ok: false; error:
   }
 }
 
-/**
- * Render an AST back to a pretty-printed string — useful for the UI
- * "normalize my formula" feature.
- */
 export function astToString(node: AstNode): string {
   switch (node.type) {
-    case "num": return String(node.value);
-    case "str": return `"${node.value}"`;
-    case "bool": return String(node.value).toUpperCase();
-    case "field": return node.path;
-    case "unary": return `${node.op}${astToString(node.operand)}`;
+    case "num":
+      return String(node.value);
+    case "str":
+      return `"${node.value}"`;
+    case "bool":
+      return String(node.value).toUpperCase();
+    case "field":
+      return node.path;
+    case "unary":
+      return `${node.op}${astToString(node.operand)}`;
     case "binary":
       return `(${astToString(node.left)} ${node.op} ${astToString(node.right)})`;
     case "call":
@@ -687,10 +738,6 @@ export function astToString(node: AstNode): string {
   }
 }
 
-/**
- * Extract all field references from an AST — used to populate the
- * "watched fields" list automatically when a rule is created.
- */
 export function extractFieldRefs(node: AstNode): string[] {
   const refs: string[] = [];
   function walk(n: AstNode) {
