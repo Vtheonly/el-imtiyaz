@@ -12,3 +12,6 @@ export * from './academic-term-type';
 export * from './gender';
 export * from './discount-type';
 export * from './payment-method';
+
+// ── Excel-migration enums ────────────────────────────────────
+export * from './ledger-category';

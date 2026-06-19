@@ -1,9 +1,19 @@
 /**
  * Payments — list & record payment page.
+ *
+ * Extended (2026-06) with a "Ledger View" toggle that switches the table
+ * to the Excel-style master ledger (ETAT 20262027 equivalent), showing
+ * the three Excel-computed columns: DEVIS ANNUEL (L), TOTAL VERSEMENTS (P),
+ * and TOTAL*CREANCE (Q). Also includes a "Recompute" button that re-runs
+ * every active formula rule across the ledger — equivalent to pressing
+ * F9 in Excel.
+ *
+ * No new tabs are created; the new controls live at the top of the
+ * existing Payments page header.
  */
 
 import { useEffect, useState } from 'react';
-import { Plus, Search, Download } from 'lucide-react';
+import { Plus, Search, Download, RefreshCw, BookOpen, FileSpreadsheet, Calculator } from 'lucide-react';
 import { Card, Badge, Button, EmptyState, StatBlock } from '../components/common';
 import { PageHeader } from '../components/common/PageHeader';
 import { DataGrid, Column } from '../components/data/DataGrid';
@@ -24,11 +34,29 @@ interface PaymentRow {
   status: PaymentStatus;
 }
 
+interface LedgerRow {
+  id: string;
+  studentName: string;
+  classCode?: string;
+  level?: string;
+  remise: number;
+  devisAnnuel: number;
+  totalVersements: number;
+  totalCreance: number;
+  grandTotal: number;
+  sourceRow?: number;
+}
+
+type ViewMode = 'payments' | 'ledger';
+
 export function Payments() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [ledger, setLedger] = useState<LedgerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('payments');
+  const [recomputing, setRecomputing] = useState(false);
   const [summary, setSummary] = useState({
     today: 0, thisMonth: 0, count: 0, outstanding: 0
   });
@@ -64,11 +92,51 @@ export function Payments() {
     }
   };
 
-  useEffect(() => {
-    loadPayments();
-  }, []);
+  const loadLedger = async () => {
+    setLoading(true);
+    try {
+      const rows = (await window.elImtiyaz.ledger.list({ pageSize: 1000 })) as any[];
+      setLedger(rows.map((e) => ({
+        id: e.id.value,
+        studentName: e.studentName,
+        classCode: e.classCode,
+        level: e.level,
+        remise: e.remise,
+        devisAnnuel: e.devisAnnuel,
+        totalVersements: e.totalVersements,
+        totalCreance: e.totalCreance,
+        grandTotal: e.grandTotal,
+        sourceRow: e.sourceRow,
+      })));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const columns: Column<PaymentRow>[] = [
+  useEffect(() => {
+    if (viewMode === 'payments') {
+      loadPayments();
+    } else {
+      loadLedger();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
+
+  const handleRecompute = async () => {
+    setRecomputing(true);
+    try {
+      const result = await window.elImtiyaz.ledger.recompute();
+      const r = result as any;
+      alert(`Recomputed ${r.recomputed} ledger entries (${r.skipped} skipped, ${r.errors?.length ?? 0} errors).`);
+      if (viewMode === 'ledger') await loadLedger();
+    } catch (err) {
+      alert(`Recompute failed: ${(err as Error).message}`);
+    } finally {
+      setRecomputing(false);
+    }
+  };
+
+  const paymentColumns: Column<PaymentRow>[] = [
     {
       key: 'receiptNumber',
       header: 'Receipt',
@@ -126,13 +194,162 @@ export function Payments() {
     }
   ];
 
+  // ── Excel-style ledger columns (mirrors ETAT 20262027 sheet) ──
+  const ledgerColumns: Column<LedgerRow>[] = [
+    {
+      key: 'sourceRow',
+      header: 'Excel Row',
+      width: 90,
+      sortable: true,
+      render: (row) => row.sourceRow ? <span className="text-mono" style={{ color: 'var(--color-text-tertiary)' }}>{row.sourceRow}</span> : '—',
+    },
+    {
+      key: 'studentName',
+      header: 'NOM (col F)',
+      width: 200,
+      sortable: true,
+      render: (row) => <span style={{ fontWeight: 'var(--weight-medium)' }}>{row.studentName}</span>,
+    },
+    {
+      key: 'level',
+      header: 'niveau (col G)',
+      width: 90,
+      render: (row) => row.level ? <Badge color="info">{row.level}</Badge> : '—',
+    },
+    {
+      key: 'classCode',
+      header: 'CLASSE (col H)',
+      width: 110,
+      render: (row) => row.classCode ?? '—',
+    },
+    {
+      key: 'remise',
+      header: 'REMISE (col J)',
+      width: 130,
+      align: 'right',
+      sortable: true,
+      render: (row) => row.remise > 0 ? <span style={{ color: 'var(--color-warning)' }}>-{formatDZD(row.remise)}</span> : '—',
+    },
+    {
+      key: 'devisAnnuel',
+      header: 'DEVIS ANNUEL (col L)',
+      width: 180,
+      align: 'right',
+      sortable: true,
+      render: (row) => <span style={{ fontWeight: 'var(--weight-semibold)' }}>{formatDZD(row.devisAnnuel)}</span>,
+    },
+    {
+      key: 'totalVersements',
+      header: 'TOTAL VERSEMENTS (col P)',
+      width: 200,
+      align: 'right',
+      sortable: true,
+      render: (row) => <span style={{ color: 'var(--color-success)' }}>{formatDZD(row.totalVersements)}</span>,
+    },
+    {
+      key: 'totalCreance',
+      header: 'TOTAL*CREANCE (col Q)',
+      width: 190,
+      align: 'right',
+      sortable: true,
+      render: (row) => (
+        <span style={{
+          fontWeight: 'var(--weight-semibold)',
+          color: row.totalCreance > 0 ? 'var(--color-danger)' : 'var(--color-text-tertiary)'
+        }}>
+          {formatDZD(row.totalCreance)}
+        </span>
+      ),
+    },
+    {
+      key: 'grandTotal',
+      header: 'TOTAL (col AL)',
+      width: 150,
+      align: 'right',
+      sortable: true,
+      render: (row) => <span style={{ color: 'var(--color-text-secondary)' }}>{formatDZD(row.grandTotal)}</span>,
+    },
+  ];
+
+  // Compute Excel-style aggregate KPIs when in ledger view.
+  const ledgerKpis = ledger.reduce(
+    (acc, r) => ({
+      devisAnnuel: acc.devisAnnuel + r.devisAnnuel,
+      versements: acc.versements + r.totalVersements,
+      creance: acc.creance + r.totalCreance,
+      count: acc.count + 1,
+    }),
+    { devisAnnuel: 0, versements: 0, creance: 0, count: 0 }
+  );
+
   return (
     <div className="el-page">
       <PageHeader
         title="Payments"
-        subtitle={`${payments.length} payments recorded`}
+        subtitle={viewMode === 'payments'
+          ? `${payments.length} payments recorded`
+          : `${ledger.length} ledger entries (Excel ETAT view)`}
         actions={
           <>
+            {/* View-mode toggle (no new tabs — switch in place) */}
+            <div className="el-segmented" role="tablist" aria-label="View mode" style={{
+              display: 'inline-flex',
+              background: 'var(--color-surface-2, #2a2b2c)',
+              borderRadius: 6,
+              padding: 2,
+              gap: 2,
+            }}>
+              <button
+                role="tab"
+                aria-selected={viewMode === 'payments'}
+                onClick={() => setViewMode('payments')}
+                style={{
+                  padding: '6px 12px',
+                  border: 'none',
+                  background: viewMode === 'payments' ? 'var(--color-primary-blue)' : 'transparent',
+                  color: viewMode === 'payments' ? '#fff' : 'var(--color-text-secondary)',
+                  borderRadius: 4,
+                  fontSize: 'var(--text-sm)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <FileSpreadsheet size={13} /> Payments
+              </button>
+              <button
+                role="tab"
+                aria-selected={viewMode === 'ledger'}
+                onClick={() => setViewMode('ledger')}
+                style={{
+                  padding: '6px 12px',
+                  border: 'none',
+                  background: viewMode === 'ledger' ? 'var(--color-primary-blue)' : 'transparent',
+                  color: viewMode === 'ledger' ? '#fff' : 'var(--color-text-secondary)',
+                  borderRadius: 4,
+                  fontSize: 'var(--text-sm)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <BookOpen size={13} /> Ledger (Excel)
+              </button>
+            </div>
+
+            {viewMode === 'ledger' && (
+              <Button
+                variant="ghost"
+                icon={<RefreshCw size={14} className={recomputing ? 'el-spin' : ''} />}
+                onClick={handleRecompute}
+                disabled={recomputing}
+              >
+                {recomputing ? 'Recomputing…' : 'Recompute (F9)'}
+              </Button>
+            )}
+
             <Button variant="ghost" icon={<Download size={14} />} onClick={() => window.elImtiyaz.reports.export('revenue')}>
               Export
             </Button>
@@ -143,43 +360,78 @@ export function Payments() {
         }
       />
 
-      {/* KPIs */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-        <StatBlock label="Today's Revenue" value={summary.today} format="currency" />
-        <StatBlock label="This Month" value={summary.thisMonth} format="currency" />
-        <StatBlock label="Total Payments" value={summary.count} format="number" />
-        <StatBlock label="Outstanding Debt" value={summary.outstanding} format="currency" />
-      </div>
+      {/* KPIs — switch by view */}
+      {viewMode === 'payments' ? (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+          <StatBlock label="Today's Revenue" value={summary.today} format="currency" />
+          <StatBlock label="This Month" value={summary.thisMonth} format="currency" />
+          <StatBlock label="Total Payments" value={summary.count} format="number" />
+          <StatBlock label="Outstanding Debt" value={summary.outstanding} format="currency" />
+        </div>
+      ) : (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+          <StatBlock label="Ledger Entries" value={ledgerKpis.count} format="number" />
+          <StatBlock label="Σ DEVIS ANNUEL (col L)" value={ledgerKpis.devisAnnuel} format="currency" />
+          <StatBlock label="Σ TOTAL VERSEMENTS (col P)" value={ledgerKpis.versements} format="currency" />
+          <StatBlock label="Σ TOTAL*CREANCE (col Q)" value={ledgerKpis.creance} format="currency" />
+        </div>
+      )}
 
       <Card>
         <div className="flex items-center gap-3" style={{ marginBottom: 'var(--space-4)' }}>
           <div className="el-search-bar" style={{ flex: 1, maxWidth: 400 }}>
             <Search size={14} style={{ color: 'var(--color-text-tertiary)' }} />
             <input
-              placeholder="Search by receipt number…"
+              placeholder={viewMode === 'payments' ? 'Search by receipt number…' : 'Search by student name…'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          {viewMode === 'ledger' && (
+            <div className="flex items-center gap-2" style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-xs)' }}>
+              <Calculator size={12} />
+              <span>Excel columns L, P, Q are auto-computed via Formula Rules</span>
+            </div>
+          )}
         </div>
 
-        <DataGrid
-          columns={columns}
-          data={payments.filter((p) =>
-            !search || p.receiptNumber.toLowerCase().includes(search.toLowerCase())
-          )}
-          rowKey={(row) => row.id}
-          loading={loading}
-          sortField="paymentDate"
-          sortDir="desc"
-          emptyState={
-            <EmptyState
-              icon={<Search size={24} />}
-              title="No payments found"
-              description="Record your first payment to see it here."
-            />
-          }
-        />
+        {viewMode === 'payments' ? (
+          <DataGrid
+            columns={paymentColumns}
+            data={payments.filter((p) =>
+              !search || p.receiptNumber.toLowerCase().includes(search.toLowerCase())
+            )}
+            rowKey={(row) => row.id}
+            loading={loading}
+            sortField="paymentDate"
+            sortDir="desc"
+            emptyState={
+              <EmptyState
+                icon={<Search size={24} />}
+                title="No payments found"
+                description="Record your first payment to see it here."
+              />
+            }
+          />
+        ) : (
+          <DataGrid
+            columns={ledgerColumns}
+            data={ledger.filter((r) =>
+              !search || r.studentName.toLowerCase().includes(search.toLowerCase())
+            )}
+            rowKey={(row) => row.id}
+            loading={loading}
+            sortField="studentName"
+            sortDir="asc"
+            emptyState={
+              <EmptyState
+                icon={<BookOpen size={24} />}
+                title="No ledger entries yet"
+                description="Import a spreadsheet or create ledger entries via workflows to see the Excel-style master ledger here."
+              />
+            }
+          />
+        )}
       </Card>
 
       <NewPaymentModal open={showNewModal} onClose={() => setShowNewModal(false)} onSaved={loadPayments} />

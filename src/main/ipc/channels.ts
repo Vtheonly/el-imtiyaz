@@ -125,7 +125,60 @@ export const IPC = {
   FS_READ_FILE: 'fs:read-file',
 
   // ── Menu commands (renderer → main → renderer loopback) ────
-  MENU_COMMAND: 'menu:command'
+  MENU_COMMAND: 'menu:command',
+
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Excel-Migration Channels (added 2026-06) ───────────────────────────
+  // Reproduce the Suivis clients.xlsx workbook behaviour in-app.
+  // ════════════════════════════════════════════════════════════════════════
+
+  // ── Ledger (ETAT 20262027 sheet) ─────────────────────────
+  LEDGER_LIST: 'ledger:list',
+  LEDGER_GET: 'ledger:get',
+  LEDGER_CREATE: 'ledger:create',
+  LEDGER_UPDATE: 'ledger:update',
+  LEDGER_DELETE: 'ledger:delete',
+  LEDGER_BY_STUDENT: 'ledger:by-student',
+  LEDGER_SUMMARY: 'ledger:summary',
+  LEDGER_RECOMPUTE: 'ledger:recompute',
+  LEDGER_AUDIT_COMMENTS_LIST: 'ledger:audit-comments:list',
+  LEDGER_AUDIT_COMMENTS_CREATE: 'ledger:audit-comments:create',
+
+  // ── Quote Blocks (Devis sheet) ───────────────────────────
+  QUOTES_LIST: 'quotes:list',
+  QUOTES_GET: 'quotes:get',
+  QUOTES_CREATE: 'quotes:create',
+  QUOTES_UPDATE: 'quotes:update',
+  QUOTES_DELETE: 'quotes:delete',
+  QUOTES_BY_STUDENT: 'quotes:by-student',
+  QUOTES_RECOMPUTE: 'quotes:recompute',
+
+  // ── Fee Schedules ────────────────────────────────────────
+  FEE_SCHEDULES_LIST: 'fee-schedules:list',
+  FEE_SCHEDULES_GET: 'fee-schedules:get',
+  FEE_SCHEDULES_CREATE: 'fee-schedules:create',
+  FEE_SCHEDULES_UPDATE: 'fee-schedules:update',
+  FEE_SCHEDULES_DELETE: 'fee-schedules:delete',
+  FEE_SCHEDULES_APPLY: 'fee-schedules:apply',
+  FEE_SCHEDULES_ENSURE_DEFAULT: 'fee-schedules:ensure-default',
+
+  // ── Formula Rules ────────────────────────────────────────
+  FORMULA_RULES_LIST: 'formula-rules:list',
+  FORMULA_RULES_GET: 'formula-rules:get',
+  FORMULA_RULES_CREATE: 'formula-rules:create',
+  FORMULA_RULES_UPDATE: 'formula-rules:update',
+  FORMULA_RULES_DELETE: 'formula-rules:delete',
+  FORMULA_RULES_TEST: 'formula-rules:test',
+  FORMULA_RULES_EVALUATE: 'formula-rules:evaluate',
+  FORMULA_RULES_SEED_STARTERS: 'formula-rules:seed-starters',
+
+  // ── Spreadsheet Templates (imported workbook metadata) ───
+  SPREADSHEET_TEMPLATES_LIST: 'spreadsheet-templates:list',
+  SPREADSHEET_TEMPLATES_GET: 'spreadsheet-templates:get',
+  SPREADSHEET_TEMPLATES_DELETE: 'spreadsheet-templates:delete',
+  SPREADSHEET_TEMPLATES_ANALYZE: 'spreadsheet-templates:analyze',
+  SPREADSHEET_IMPORT_LEDGER: 'spreadsheet-templates:import-ledger',
+  SPREADSHEET_IMPORT_COMMENTS: 'spreadsheet-templates:import-comments'
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];

@@ -10,7 +10,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type EntityTag = 'Student' | 'Parent' | 'Payment' | 'Invoice' | 'Class' |
   'Employee' | 'Attendance' | 'AcademicYear' | 'Receipt' | 'AuditLog' |
-  'FeeTemplate' | 'Scholarship' | 'Term' | 'Workflow' | 'Notification';
+  'FeeTemplate' | 'Scholarship' | 'Term' | 'Workflow' | 'Notification' |
+  // ── Excel-migration entities ─────────────────────────────────
+  'LedgerEntry' | 'QuoteBlock' | 'FeeSchedule' | 'FormulaRule' |
+  'PaymentAuditComment' | 'SpreadsheetTemplate';
 
 export class Identifier<T extends EntityTag> {
   private constructor(public readonly value: string) {}

@@ -79,6 +79,26 @@ export interface NodeServices {
   createInvoice: (input: unknown) => Promise<unknown>;
   logActivity: (action: string, payload: unknown) => Promise<void>;
   query: (sql: string, params?: unknown[]) => Promise<unknown[]>;
+  // ── Excel-migration node services (added 2026-06) ──────────
+  /** Evaluate a formula expression against a context (no persistence). */
+  evalFormula: (
+    expression: string,
+    ctx: { fields: Record<string, unknown>; ranges?: Record<string, Array<Record<string, unknown>>> }
+  ) => Promise<{ ok: true; value: unknown } | { ok: false; error: string }>;
+  /** Create a ledger entry (Excel ETAT row). */
+  createLedgerEntry: (input: unknown) => Promise<unknown>;
+  /** Update a ledger entry — recomputes derived fields. */
+  updateLedgerEntry: (id: string, patch: unknown) => Promise<unknown>;
+  /** List ledger entries with optional filter. */
+  listLedgerEntries: (filter?: unknown) => Promise<unknown[]>;
+  /** Recompute every ledger entry — call after fee schedule change. */
+  recomputeLedger: () => Promise<{ recomputed: number; skipped: number; errors: unknown[] }>;
+  /** Create a quote block (Excel Devis block). */
+  createQuoteBlock: (input: unknown) => Promise<unknown>;
+  /** Apply a fee schedule to a list of students (creates invoices + ledger entries). */
+  applyFeeSchedule: (scheduleId: string, studentIds: string[]) => Promise<unknown>;
+  /** List all active formula rules. */
+  listFormulaRules: (scope?: string) => Promise<unknown[]>;
 }
 
 const anyIn = (id = "in"): WorkflowNodePort => ({
@@ -599,6 +619,380 @@ export const NODE_REGISTRY: NodeDefinition[] = [
       }
       const rows = await ctx.services.query(sql, params);
       return { outputs: { out: rows } };
+    },
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Excel-Migration Nodes (added 2026-06) ────────────────────────────────
+  // These nodes reproduce the Excel workbook's behaviour inside the visual
+  // workflow builder. They let users compose new calculations or data
+  // insertions without writing code.
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    id: "transform.formula.eval",
+    type: "transform",
+    label: "Evaluate Formula",
+    description:
+      "Evaluates a safe mini-language formula (Excel-like: arithmetic, IF, SUM, VLOOKUP). " +
+      "Reproduces Excel cell formulas as a workflow step. Use this to define custom calculations.",
+    icon: "Sigma",
+    category: "Transforms",
+    inputs: [anyIn()],
+    outputs: [anyOut()],
+    configSchema: [
+      {
+        key: "expression",
+        label: "Formula expression",
+        type: "textarea",
+        placeholder: "fi + v2 + altV2 + v3 + t1 + t2 + t3",
+        required: true,
+        help:
+          "Excel-like expression. Supports + - * / %, IF(cond, a, b), SUM(...), " +
+          "VLOOKUP(key, range, col, exact), field references via dot notation.",
+      },
+      {
+        key: "contextSource",
+        label: "Where do field values come from?",
+        type: "select",
+        options: [
+          { value: "input", label: "From incoming node input" },
+          { value: "custom", label: "Custom JSON context below" },
+        ],
+        default: "input",
+      },
+      {
+        key: "customContext",
+        label: "Custom context (JSON)",
+        type: "json",
+        placeholder: '{ "fields": { "fi": 25000, "v2": 71500 } }',
+        visibleWhen: { field: "contextSource", equals: "custom" },
+        help: "Provide a JSON object with a `fields` map and optional `ranges`.",
+      },
+    ],
+    execute: async (ctx) => {
+      const expression = String(ctx.config.expression ?? "");
+      if (!expression.trim()) {
+        return { outputs: {}, error: "Expression is required" };
+      }
+      let evalCtx: { fields: Record<string, unknown>; ranges?: Record<string, Array<Record<string, unknown>>> };
+      if (ctx.config.contextSource === "custom") {
+        try {
+          evalCtx = JSON.parse(String(ctx.config.customContext ?? "{ \"fields\": {} }"));
+        } catch {
+          return { outputs: {}, error: "Invalid custom context JSON" };
+        }
+      } else {
+        // Use incoming input as the field map directly.
+        const input = (ctx.inputs.in ?? {}) as Record<string, unknown>;
+        evalCtx = { fields: input };
+      }
+      const result = await ctx.services.evalFormula(expression, evalCtx);
+      if (!result.ok) {
+        return { outputs: {}, error: (result as { error: string }).error };
+      }
+      ctx.logger("info", "transform.formula.eval.evaluated", {
+        expression,
+        result: result.value,
+      });
+      return { outputs: { out: result.value, original: ctx.inputs.in } };
+    },
+  },
+
+  {
+    id: "transform.aggregate.ledger",
+    type: "transform",
+    label: "Aggregate Ledger",
+    description:
+      "Runs an aggregation across ledger entries (sum, count, avg, min, max) " +
+      "optionally filtered by class, level, or academic year. Reproduces Excel " +
+      "summary formulas like =SUM(P2:P1032).",
+    icon: "Calculator",
+    category: "Transforms",
+    inputs: [anyIn()],
+    outputs: [anyOut()],
+    configSchema: [
+      {
+        key: "operation",
+        label: "Aggregation",
+        type: "select",
+        options: [
+          { value: "sum", label: "Sum" },
+          { value: "count", label: "Count" },
+          { value: "avg", label: "Average" },
+          { value: "min", label: "Minimum" },
+          { value: "max", label: "Maximum" },
+        ],
+        default: "sum",
+        required: true,
+      },
+      {
+        key: "field",
+        label: "Field to aggregate",
+        type: "select",
+        options: [
+          { value: "devisAnnuel", label: "DEVIS ANNUEL (col L)" },
+          { value: "totalVersements", label: "TOTAL VERSEMENTS (col P)" },
+          { value: "totalCreance", label: "TOTAL CREANCE (col Q)" },
+          { value: "grandTotal", label: "GRAND TOTAL (col AL)" },
+          { value: "remise", label: "REMISE (col J)" },
+        ],
+        default: "totalCreance",
+        required: true,
+      },
+      {
+        key: "filterClass",
+        label: "Filter by class code (optional)",
+        type: "text",
+        placeholder: "CE1",
+      },
+      {
+        key: "filterLevel",
+        label: "Filter by level (optional)",
+        type: "text",
+        placeholder: "PRIM",
+      },
+    ],
+    execute: async (ctx) => {
+      const op = String(ctx.config.operation ?? "sum");
+      const field = String(ctx.config.field ?? "totalCreance");
+      const filter: { classCode?: string; level?: string } = {};
+      if (ctx.config.filterClass) filter.classCode = String(ctx.config.filterClass);
+      if (ctx.config.filterLevel) filter.level = String(ctx.config.filterLevel);
+
+      const entries = (await ctx.services.listLedgerEntries(filter)) as Array<Record<string, unknown>>;
+      const values = entries.map((e) => Number(e[field]) || 0);
+
+      let result = 0;
+      switch (op) {
+        case "sum":   result = values.reduce((s, v) => s + v, 0); break;
+        case "count": result = values.length; break;
+        case "avg":   result = values.length ? values.reduce((s, v) => s + v, 0) / values.length : 0; break;
+        case "min":   result = values.length ? Math.min(...values) : 0; break;
+        case "max":   result = values.length ? Math.max(...values) : 0; break;
+      }
+
+      ctx.logger("info", "transform.aggregate.ledger.complete", {
+        op, field, filter, count: entries.length, result,
+      });
+      return { outputs: { out: result, count: entries.length } };
+    },
+  },
+
+  {
+    id: "transform.reconcile.balance",
+    type: "transform",
+    label: "Reconcile Balances",
+    description:
+      "Recomputes DEVIS ANNUEL, TOTAL VERSEMENTS, TOTAL CREANCE and GRAND TOTAL " +
+      "for every ledger entry. Use this after a fee schedule change or after " +
+      "importing new data — exactly like pressing F9 in Excel.",
+    icon: "RefreshCw",
+    category: "Transforms",
+    inputs: [anyIn()],
+    outputs: [anyOut()],
+    configSchema: [],
+    execute: async (ctx) => {
+      const result = await ctx.services.recomputeLedger();
+      ctx.logger("info", "transform.reconcile.balance.complete", result);
+      return { outputs: { out: result } };
+    },
+  },
+
+  {
+    id: "action.create.ledger.entry",
+    type: "action",
+    label: "Create Ledger Entry",
+    description:
+      "Creates a new row in the master ledger (ETAT 20262027 equivalent). " +
+      "Computes derived fields automatically.",
+    icon: "FilePlus",
+    category: "Actions",
+    inputs: [anyIn()],
+    outputs: [anyOut()],
+    configSchema: [
+      { key: "studentName", label: "Student name", type: "text", required: true },
+      { key: "phoneNumbers", label: "Phone numbers (slash-separated)", type: "text" },
+      { key: "tutorName", label: "Tutor name", type: "text" },
+      { key: "level", label: "Level (PRIM, MAT, ...)", type: "text" },
+      { key: "classCode", label: "Class code (CE1, CM2, ...)", type: "text" },
+      { key: "optionCode", label: "Option (TRNSP, ...)", type: "text" },
+      { key: "destination", label: "Transport destination", type: "text" },
+      { key: "remise", label: "Discount (DZD)", type: "number", default: 0 },
+      { key: "fi", label: "Registration fee paid (col R)", type: "number", default: 0 },
+      { key: "v2", label: "Installment V2 (col S)", type: "number", default: 0 },
+      { key: "altV2", label: "Alt 2V (col T)", type: "number", default: 0 },
+      { key: "v3", label: "Installment V3 (col U)", type: "number", default: 0 },
+      { key: "t1", label: "Transport T1 (col W)", type: "number", default: 0 },
+      { key: "t2", label: "Transport T2 (col X)", type: "number", default: 0 },
+      { key: "t3", label: "Transport T3 (col Y)", type: "number", default: 0 },
+      {
+        key: "linkStudentId",
+        label: "Link to existing student ID (optional)",
+        type: "text",
+        help: "If provided, the ledger entry will be linked to this student record.",
+      },
+    ],
+    execute: async (ctx) => {
+      const cfg = ctx.config as Record<string, unknown>;
+      const input: Record<string, unknown> = { ...cfg, studentId: cfg.linkStudentId || undefined };
+      delete input.linkStudentId;
+      // Allow input passthrough (e.g. student from trigger).
+      if (ctx.inputs.in && typeof ctx.inputs.in === "object") {
+        const incoming = ctx.inputs.in as Record<string, unknown>;
+        if (incoming.studentId && !input.studentId) input.studentId = incoming.studentId;
+        if (incoming.studentName && !input.studentName) input.studentName = incoming.studentName;
+      }
+      const entry = await ctx.services.createLedgerEntry(input);
+      ctx.logger("info", "action.create.ledger.entry.created", { entry });
+      return { outputs: { out: entry } };
+    },
+  },
+
+  {
+    id: "action.apply.fee.schedule",
+    type: "action",
+    label: "Apply Fee Schedule",
+    description:
+      "Applies a fee schedule to a list of students. For each student, creates " +
+      "the appropriate invoices and a ledger entry pre-populated with the " +
+      "schedule's fees. Reproduces the Excel workflow of pasting a fee tier " +
+      "into column L for a class of pupils.",
+    icon: "Layers",
+    category: "Actions",
+    inputs: [anyIn()],
+    outputs: [anyOut()],
+    configSchema: [
+      {
+        key: "scheduleId",
+        label: "Fee schedule ID",
+        type: "text",
+        required: true,
+        help: "The UUID of the FeeSchedule to apply.",
+      },
+      {
+        key: "studentIds",
+        label: "Student IDs (comma-separated)",
+        type: "textarea",
+        placeholder: "uuid1, uuid2, uuid3",
+        help: "Comma-separated list. If omitted, uses the incoming node input.",
+      },
+    ],
+    execute: async (ctx) => {
+      const scheduleId = String(ctx.config.scheduleId ?? "");
+      let studentIds: string[] = [];
+      if (ctx.config.studentIds) {
+        studentIds = String(ctx.config.studentIds)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      } else if (Array.isArray(ctx.inputs.in)) {
+        studentIds = (ctx.inputs.in as unknown[]).map((s) =>
+          typeof s === "string" ? s : (s as { id?: string; studentId?: string }).id ?? (s as { studentId?: string }).studentId ?? ""
+        ).filter(Boolean);
+      }
+      if (!scheduleId || studentIds.length === 0) {
+        return { outputs: {}, error: "scheduleId and at least one studentId are required" };
+      }
+      const result = await ctx.services.applyFeeSchedule(scheduleId, studentIds);
+      ctx.logger("info", "action.apply.fee.schedule.applied", {
+        scheduleId,
+        studentCount: studentIds.length,
+        result,
+      });
+      return { outputs: { out: result } };
+    },
+  },
+
+  {
+    id: "action.create.quote.block",
+    type: "action",
+    label: "Create Quote Block",
+    description:
+      "Creates a new Devis-style quote block. Computes per-line totals, " +
+      "sub-total, net payable, and 5% school-fee tax automatically. " +
+      "Reproduces the Excel Devis sheet block behaviour.",
+    icon: "FileText",
+    category: "Actions",
+    inputs: [anyIn()],
+    outputs: [anyOut()],
+    configSchema: [
+      { key: "name", label: "Quote name", type: "text", required: true },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "studentId", label: "Student ID (optional)", type: "text" },
+      {
+        key: "itemsJson",
+        label: "Line items (JSON array)",
+        type: "json",
+        placeholder:
+          '[{"label":"Tuition","amounts":[0,0,205000,0,0,0,0,0]}]',
+        help:
+          "Each item: { label, amounts: number[8], classe?, fi?, fraisScolaire?, service?, transport? }",
+      },
+      { key: "advances", label: "Advances (DZD)", type: "number", default: 0 },
+      { key: "discounts", label: "Discounts (DZD)", type: "number", default: 0 },
+    ],
+    execute: async (ctx) => {
+      let items: unknown[] = [];
+      try {
+        items = ctx.config.itemsJson
+          ? JSON.parse(String(ctx.config.itemsJson))
+          : [];
+      } catch {
+        return { outputs: {}, error: "Invalid itemsJson" };
+      }
+      const input = {
+        name: ctx.config.name,
+        description: ctx.config.description,
+        studentId: ctx.config.studentId || undefined,
+        items,
+        advances: Number(ctx.config.advances) || 0,
+        discounts: Number(ctx.config.discounts) || 0,
+      };
+      const quote = await ctx.services.createQuoteBlock(input);
+      ctx.logger("info", "action.create.quote.block.created", { quote });
+      return { outputs: { out: quote } };
+    },
+  },
+
+  {
+    id: "condition.formula.evaluate",
+    type: "condition",
+    label: "Formula Condition",
+    description:
+      "Branches based on a user-defined formula that evaluates to true/false. " +
+      "Lets you build arbitrary conditional logic in workflows — e.g. " +
+      "IF(totalCreance > 10000 AND classCode = \"CE1\").",
+    icon: "GitBranch",
+    category: "Conditions",
+    inputs: [anyIn()],
+    outputs: [trueOut(), falseOut()],
+    configSchema: [
+      {
+        key: "expression",
+        label: "Boolean expression",
+        type: "textarea",
+        placeholder: "totalCreance > 10000 AND classCode = \"CE1\"",
+        required: true,
+        help:
+          "Use field names from the incoming input. Comparison operators: " +
+          "= <> < > <= >=. Logical: AND, OR, NOT. Returns true/false.",
+      },
+    ],
+    execute: async (ctx) => {
+      const expression = String(ctx.config.expression ?? "");
+      const input = (ctx.inputs.in ?? {}) as Record<string, unknown>;
+      const result = await ctx.services.evalFormula(expression, { fields: input });
+      if (!result.ok) {
+        return { outputs: {}, branch: "false", error: (result as { error: string }).error };
+      }
+      const branch = (result.value === true || result.value === "true" || Number(result.value) > 0)
+        ? "true"
+        : "false";
+      ctx.logger("info", "condition.formula.evaluate.evaluated", {
+        expression, value: result.value, branch,
+      });
+      return { outputs: { true: ctx.inputs.in, false: ctx.inputs.in }, branch };
     },
   },
 ];

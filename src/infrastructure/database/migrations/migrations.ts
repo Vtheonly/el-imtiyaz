@@ -372,5 +372,187 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_notifications_priority ON notifications(priority);
       CREATE INDEX IF NOT EXISTS idx_notifications_scheduled ON notifications(scheduled_for);
     `
+  },
+  {
+    id: '005_excel_ledger_migration',
+    description: 'Excel-migration tables: ledger_entries, quote_blocks, fee_schedules, formula_rules, payment_audit_comments, spreadsheet_templates',
+    up: `
+      -- ── Ledger Entries ───────────────────────────────────
+      -- Mirrors one row of the Excel "ETAT 20262027" sheet.
+      CREATE TABLE IF NOT EXISTS ledger_entries (
+        id TEXT PRIMARY KEY,
+        student_id TEXT REFERENCES students(id) ON DELETE SET NULL,
+        academic_year_id TEXT REFERENCES academic_years(id) ON DELETE SET NULL,
+        source_row INTEGER,
+
+        -- Identity / descriptive (Excel cols B-I)
+        infos TEXT,
+        email TEXT,
+        phone_numbers TEXT,
+        tutor_name TEXT,
+        student_name TEXT NOT NULL,
+        level TEXT,
+        class_code TEXT,
+        option_code TEXT,
+
+        -- Discount / quote inputs (Excel cols J-K)
+        remise REAL NOT NULL DEFAULT 0,
+        justification TEXT,
+
+        -- Computed values (Excel cols L, P, Q)
+        devis_annuel REAL NOT NULL DEFAULT 0,
+        total_versements REAL NOT NULL DEFAULT 0,
+        total_creance REAL NOT NULL DEFAULT 0,
+
+        -- Debt carry-over (Excel cols M-O)
+        reimbursement REAL NOT NULL DEFAULT 0,
+        prior_debt REAL NOT NULL DEFAULT 0,
+        debt_settlement REAL NOT NULL DEFAULT 0,
+
+        -- Payment installments (Excel cols R-Y)
+        fi REAL NOT NULL DEFAULT 0,
+        v2 REAL NOT NULL DEFAULT 0,
+        alt_v2 REAL NOT NULL DEFAULT 0,
+        v3 REAL NOT NULL DEFAULT 0,
+        destination TEXT,
+        t1 REAL NOT NULL DEFAULT 0,
+        t2 REAL NOT NULL DEFAULT 0,
+        t3 REAL NOT NULL DEFAULT 0,
+
+        -- Extras (Excel cols Z-AE)
+        psy1 REAL NOT NULL DEFAULT 0,
+        psy2 REAL NOT NULL DEFAULT 0,
+        orth1 REAL NOT NULL DEFAULT 0,
+        orth2 REAL NOT NULL DEFAULT 0,
+        e_plant REAL NOT NULL DEFAULT 0,
+        ratrapage REAL NOT NULL DEFAULT 0,
+
+        -- Quarterly tracking (Excel cols AF-AK)
+        september REAL NOT NULL DEFAULT 0,
+        september_balance REAL,
+        december REAL NOT NULL DEFAULT 0,
+        december_balance REAL,
+        march REAL NOT NULL DEFAULT 0,
+        march_balance REAL,
+
+        -- Grand total (Excel col AL)
+        grand_total REAL NOT NULL DEFAULT 0,
+
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_ledger_student ON ledger_entries(student_id);
+      CREATE INDEX IF NOT EXISTS idx_ledger_academic_year ON ledger_entries(academic_year_id);
+      CREATE INDEX IF NOT EXISTS idx_ledger_class ON ledger_entries(class_code);
+      CREATE INDEX IF NOT EXISTS idx_ledger_level ON ledger_entries(level);
+
+      -- ── Quote Blocks ─────────────────────────────────────
+      -- Mirrors one block of the Excel "Devis" sheet (10 blocks per sheet).
+      CREATE TABLE IF NOT EXISTS quote_blocks (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        student_id TEXT REFERENCES students(id) ON DELETE SET NULL,
+        academic_year_id TEXT REFERENCES academic_years(id) ON DELETE SET NULL,
+        items_json TEXT NOT NULL DEFAULT '[]',
+        advances REAL NOT NULL DEFAULT 0,
+        discounts REAL NOT NULL DEFAULT 0,
+        sub_total REAL NOT NULL DEFAULT 0,
+        net_payable REAL NOT NULL DEFAULT 0,
+        school_fee_tax REAL NOT NULL DEFAULT 0,
+        block_date TEXT NOT NULL,
+        template_id TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_quote_blocks_student ON quote_blocks(student_id);
+      CREATE INDEX IF NOT EXISTS idx_quote_blocks_academic_year ON quote_blocks(academic_year_id);
+
+      -- ── Fee Schedules ────────────────────────────────────
+      -- Makes the Excel implicit pricing (25k/205k/35k/55k etc.) explicit & editable.
+      CREATE TABLE IF NOT EXISTS fee_schedules (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        grade_level TEXT NOT NULL,
+        academic_year_id TEXT REFERENCES academic_years(id) ON DELETE SET NULL,
+        lines_json TEXT NOT NULL DEFAULT '[]',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_fee_schedules_grade ON fee_schedules(grade_level);
+      CREATE INDEX IF NOT EXISTS idx_fee_schedules_active ON fee_schedules(is_active);
+
+      -- ── Formula Rules ────────────────────────────────────
+      -- User-defined calculation rules. Reproduces Excel cell formulas
+      -- as first-class, editable, persistable entities.
+      CREATE TABLE IF NOT EXISTS formula_rules (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        expression TEXT NOT NULL,
+        scope TEXT NOT NULL DEFAULT 'ledger',
+        target_field TEXT,
+        trigger TEXT NOT NULL DEFAULT 'manual',
+        watched_fields_json TEXT NOT NULL DEFAULT '[]',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        condition_expr TEXT,
+        priority INTEGER NOT NULL DEFAULT 100,
+        last_result TEXT,
+        last_evaluated_at TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_formula_rules_scope ON formula_rules(scope);
+      CREATE INDEX IF NOT EXISTS idx_formula_rules_active ON formula_rules(is_active);
+      CREATE INDEX IF NOT EXISTS idx_formula_rules_priority ON formula_rules(priority);
+
+      -- ── Payment Audit Comments ───────────────────────────
+      -- Mirrors Excel column AM (free-text payment audit trail).
+      CREATE TABLE IF NOT EXISTS payment_audit_comments (
+        id TEXT PRIMARY KEY,
+        ledger_entry_id TEXT NOT NULL REFERENCES ledger_entries(id) ON DELETE CASCADE,
+        student_id TEXT REFERENCES students(id) ON DELETE SET NULL,
+        payment_id TEXT REFERENCES payments(id) ON DELETE SET NULL,
+        raw_text TEXT NOT NULL,
+        amount REAL,
+        day INTEGER,
+        month INTEGER,
+        year INTEGER,
+        batch TEXT,
+        is_closed INTEGER NOT NULL DEFAULT 0,
+        excel_cell TEXT,
+        source_row INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_comments_ledger ON payment_audit_comments(ledger_entry_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_comments_student ON payment_audit_comments(student_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_comments_payment ON payment_audit_comments(payment_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_comments_batch ON payment_audit_comments(batch);
+
+      -- ── Spreadsheet Templates ────────────────────────────
+      -- Captures the *shape* of an imported Excel workbook (sheets,
+      -- headers, formula patterns, named ranges, cross-sheet refs).
+      CREATE TABLE IF NOT EXISTS spreadsheet_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        source_file_name TEXT NOT NULL,
+        source_file_hash TEXT NOT NULL,
+        sheets_json TEXT NOT NULL DEFAULT '[]',
+        named_ranges_json TEXT NOT NULL DEFAULT '[]',
+        cross_sheet_refs_json TEXT NOT NULL DEFAULT '[]',
+        comment_count INTEGER NOT NULL DEFAULT 0,
+        broken_reference_count INTEGER NOT NULL DEFAULT 0,
+        imported_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_spreadsheet_templates_hash ON spreadsheet_templates(source_file_hash);
+    `
   }
 ];

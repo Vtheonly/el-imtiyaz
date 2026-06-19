@@ -67,6 +67,18 @@ export class BootstrapPipeline {
       });
     }
 
+    // Excel-migration defaults — seed the default fee schedule and
+    // starter formula rules so the app behaves like the Excel workbook
+    // from the very first run.
+    try {
+      await this.seedExcelMigrationDefaults(database);
+      logger.info("bootstrap.excel-migration.defaults.seeded");
+    } catch (err) {
+      logger.error("bootstrap.excel-migration.defaults.error", {
+        error: (err as Error).message,
+      });
+    }
+
     // Event bus — wires cross-domain reactions.
     const eventBus = new EventBus();
     logger.info("bootstrap.event-bus.ready");
@@ -262,6 +274,194 @@ export class BootstrapPipeline {
           now,
         ],
       );
+    });
+  }
+
+  /**
+   * Seed the default fee schedule + starter formula rules so the app
+   * reproduces the Suivis clients.xlsx workbook's behaviour from the
+   * very first run. Idempotent — if rows already exist, this is a no-op.
+   */
+  private async seedExcelMigrationDefaults(db: DatabaseClient): Promise<void> {
+    const now = new Date().toISOString();
+
+    db.transaction(() => {
+      // ── Default fee schedule (mirrors Excel constants) ─────────
+      const existingSchedule = db.get<{ count: number }>(
+        "SELECT COUNT(*) as count FROM fee_schedules WHERE is_active = 1",
+      );
+      if (!existingSchedule || existingSchedule.count === 0) {
+        const scheduleId = uuidv4();
+        const lines = [
+          { id: uuidv4(), type: "registration", label: "Registration Fee", amount: 25000, includedInQuote: true, isInstallment: true, excelColumn: "R" },
+          { id: uuidv4(), type: "tuition", label: "Base Tuition", amount: 205000, includedInQuote: true, isInstallment: false, excelColumn: "L" },
+          { id: uuidv4(), type: "transport_base", label: "Transport (standard)", amount: 35000, includedInQuote: true, isInstallment: false, excelColumn: "L" },
+          { id: uuidv4(), type: "transport_premium", label: "Transport (premium)", amount: 55000, includedInQuote: true, isInstallment: false, excelColumn: "L" },
+          { id: uuidv4(), type: "transport_t1", label: "Transport T1", amount: 30000, includedInQuote: false, isInstallment: true, excelColumn: "W" },
+          { id: uuidv4(), type: "transport_t2", label: "Transport T2", amount: 15000, includedInQuote: false, isInstallment: true, excelColumn: "X" },
+          { id: uuidv4(), type: "transport_t3", label: "Transport T3", amount: 10000, includedInQuote: false, isInstallment: true, excelColumn: "Y" },
+        ];
+        db.run(
+          `INSERT INTO fee_schedules (id, name, description, grade_level, academic_year_id, lines_json, is_active, created_at, updated_at)
+           VALUES (?, ?, ?, 'ALL', NULL, ?, 1, ?, ?)`,
+          [
+            scheduleId,
+            "Default (Excel 2026-2027)",
+            "Auto-seeded from the implicit pricing in the Suivis clients.xlsx workbook",
+            JSON.stringify(lines),
+            now,
+            now,
+          ],
+        );
+        logger.info("bootstrap.excel-migration.feeSchedule.seeded", { id: scheduleId });
+      }
+
+      // ── Starter formula rules (reproduce Excel cell formulas) ─
+      const existingRules = db.get<{ count: number }>(
+        "SELECT COUNT(*) as count FROM formula_rules",
+      );
+      if (!existingRules || existingRules.count === 0) {
+        const rules = [
+          {
+            name: "DEVIS ANNUEL",
+            description: "Reproduces Excel column L: registration + tuition + transport - discount",
+            expression: "registration + baseTuition + transportBase - remise",
+            scope: "ledger", targetField: "devisAnnuel", trigger: "on_save",
+            watched: ["remise", "registration", "baseTuition", "transportBase"],
+            priority: 10,
+          },
+          {
+            name: "TOTAL VERSEMENTS",
+            description: "Reproduces Excel column P: sum of all 7 payment installments",
+            expression: "fi + v2 + altV2 + v3 + t1 + t2 + t3",
+            scope: "ledger", targetField: "totalVersements", trigger: "on_save",
+            watched: ["fi", "v2", "altV2", "v3", "t1", "t2", "t3"],
+            priority: 20,
+          },
+          {
+            name: "TOTAL CREANCE",
+            description: "Reproduces Excel column Q: devis_annuel - total_versements",
+            expression: "devisAnnuel - totalVersements",
+            scope: "ledger", targetField: "totalCreance", trigger: "on_save",
+            watched: ["devisAnnuel", "totalVersements"],
+            priority: 30,
+          },
+          {
+            name: "GRAND TOTAL",
+            description: "Reproduces Excel column AL: sum of all payment + extras + quarterly",
+            expression: "totalVersements + psy1 + psy2 + orth1 + orth2 + ePlant + ratrapage + september + december + march",
+            scope: "ledger", targetField: "grandTotal", trigger: "on_save",
+            watched: ["totalVersements", "psy1", "psy2", "orth1", "orth2", "ePlant", "ratrapage", "september", "december", "march"],
+            priority: 40,
+          },
+          {
+            name: "Quote Sub-Total",
+            description: "Reproduces Excel Devis I27",
+            expression: "SUM(lineItems.lineTotal)",
+            scope: "quote", targetField: "subTotal", trigger: "on_save",
+            watched: ["lineItems.lineTotal"], priority: 10,
+          },
+          {
+            name: "Quote Net Payable",
+            description: "Reproduces Excel Devis I31",
+            expression: "subTotal - advances - discounts",
+            scope: "quote", targetField: "netPayable", trigger: "on_save",
+            watched: ["subTotal", "advances", "discounts"], priority: 20,
+          },
+          {
+            name: "Quote 5% Tax on School Fees",
+            description: "Reproduces Excel Devis D35",
+            expression: "SUM(lineItems.fraisScolaireAmount) * 0.05",
+            scope: "quote", targetField: "schoolFeeTax", trigger: "on_save",
+            watched: ["lineItems.fraisScolaireAmount"], priority: 30,
+          },
+        ];
+
+        for (const r of rules) {
+          db.run(
+            `INSERT INTO formula_rules (id, name, description, expression, scope, target_field, trigger, watched_fields_json, is_active, condition_expr, priority, last_result, last_evaluated_at, last_error, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, NULL, NULL, NULL, ?, ?)`,
+            [
+              uuidv4(),
+              r.name,
+              r.description,
+              r.expression,
+              r.scope,
+              r.targetField,
+              r.trigger,
+              JSON.stringify(r.watched),
+              r.priority,
+              now,
+              now,
+            ],
+          );
+        }
+        logger.info("bootstrap.excel-migration.formulaRules.seeded", { count: rules.length });
+      }
+
+      // ── Demo ledger entry linked to the first student (Excel row 2) ─
+      // This makes the Student Profile page show the "Excel Ledger Entry"
+      // card with real computed values. Idempotent — only seeds if there
+      // are no ledger entries yet AND a student exists.
+      const existingLedger = db.get<{ count: number }>(
+        "SELECT COUNT(*) as count FROM ledger_entries",
+      );
+      if (!existingLedger || existingLedger.count === 0) {
+        const firstStudent = db.get<{ id: string; full_name: string; academic_year_id: string | null }>(
+          "SELECT id, full_name, academic_year_id FROM students LIMIT 1",
+        );
+        if (firstStudent) {
+          const ledgerId = uuidv4();
+          db.run(
+            `INSERT INTO ledger_entries (
+              id, student_id, academic_year_id, source_row,
+              student_name, phone_numbers, tutor_name, level, class_code, option_code, destination,
+              remise, justification,
+              devis_annuel, total_versements, total_creance, grand_total,
+              fi, v2, alt_v2, v3, t1, t2, t3,
+              psy1, psy2, orth1, orth2, e_plant, ratrapage,
+              september, december, march,
+              created_at, updated_at
+            ) VALUES (
+              ?, ?, ?, 2,
+              ?, '+213 661 98 76 54', 'Tutor', 'PRIM', 'Grade 1 A', 'TRNSP', 'Algiers',
+              25500, 'Sibling discount (Excel row 2 reproduction)',
+              239500, 254500, -15000, 254500,
+              25000, 71500, 0, 71500, 30000, 15000, 10000,
+              0, 0, 0, 0, 0, 0,
+              0, 0, 0,
+              ?, ?
+            )`,
+            [
+              ledgerId,
+              firstStudent.id,
+              firstStudent.academic_year_id,
+              firstStudent.full_name,
+              now,
+              now,
+            ],
+          );
+
+          // Audit comment in Excel column-AM format
+          const commentId = uuidv4();
+          db.run(
+            `INSERT INTO payment_audit_comments (
+              id, ledger_entry_id, student_id, raw_text,
+              amount, day, month, year, batch, is_closed,
+              excel_cell, source_row, created_at, updated_at
+            ) VALUES (
+              ?, ?, ?, '254500/05/09B11',
+              254500, 5, 9, 2025, 'B11', 0,
+              'AM2', 2, ?, ?
+            )`,
+            [commentId, ledgerId, firstStudent.id, now, now],
+          );
+          logger.info("bootstrap.excel-migration.demoLedger.seeded", {
+            id: ledgerId,
+            studentId: firstStudent.id,
+          });
+        }
+      }
     });
   }
 }

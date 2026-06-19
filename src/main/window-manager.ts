@@ -22,8 +22,8 @@ export class WindowManager {
     const preloadPath = AppPaths.resolve().preloadScript;
 
     const options: BrowserWindowConstructorOptions = {
-      width: 1440,
-      height: 900,
+      width: 1600,
+      height: 1300,
       minWidth: 1024,
       minHeight: 680,
       show: false,

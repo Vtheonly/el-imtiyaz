@@ -188,6 +188,76 @@ const api = {
     return () => ipcRenderer.removeListener('menu:command', listener);
   },
 
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Excel-Migration API (added 2026-06) ───────────────────────────────
+  // Reproduces the Suivis clients.xlsx workbook behaviour in-app.
+  // ════════════════════════════════════════════════════════════════════════
+
+  // ── Ledger (ETAT 20262027 sheet) ─────────────────────────
+  ledger: {
+    list: (query?: unknown) => invoke('ledger:list', query),
+    get: (id: string) => invoke('ledger:get', id),
+    create: (input: unknown) => invoke('ledger:create', input),
+    update: (id: string, patch: unknown) => invoke('ledger:update', id, patch),
+    delete: (id: string) => invoke('ledger:delete', id),
+    byStudent: (studentId: string) => invoke('ledger:by-student', studentId),
+    summary: () => invoke('ledger:summary'),
+    recompute: () => invoke('ledger:recompute'),
+    auditComments: {
+      list: (ledgerEntryId: string) => invoke('ledger:audit-comments:list', ledgerEntryId),
+      create: (input: unknown) => invoke('ledger:audit-comments:create', input)
+    }
+  },
+
+  // ── Quote Blocks (Devis sheet) ───────────────────────────
+  quotes: {
+    list: (query?: unknown) => invoke('quotes:list', query),
+    get: (id: string) => invoke('quotes:get', id),
+    create: (input: unknown) => invoke('quotes:create', input),
+    update: (id: string, patch: unknown) => invoke('quotes:update', id, patch),
+    delete: (id: string) => invoke('quotes:delete', id),
+    byStudent: (studentId: string) => invoke('quotes:by-student', studentId),
+    recompute: (id: string) => invoke('quotes:recompute', id)
+  },
+
+  // ── Fee Schedules ────────────────────────────────────────
+  feeSchedules: {
+    list: (query?: unknown) => invoke('fee-schedules:list', query),
+    get: (id: string) => invoke('fee-schedules:get', id),
+    create: (input: unknown) => invoke('fee-schedules:create', input),
+    update: (id: string, patch: unknown) => invoke('fee-schedules:update', id, patch),
+    delete: (id: string) => invoke('fee-schedules:delete', id),
+    apply: (scheduleId: string, studentIds: string[]) =>
+      invoke('fee-schedules:apply', scheduleId, studentIds),
+    ensureDefault: () => invoke('fee-schedules:ensure-default')
+  },
+
+  // ── Formula Rules ────────────────────────────────────────
+  formulaRules: {
+    list: (query?: unknown) => invoke('formula-rules:list', query),
+    get: (id: string) => invoke('formula-rules:get', id),
+    create: (input: unknown) => invoke('formula-rules:create', input),
+    update: (id: string, patch: unknown) => invoke('formula-rules:update', id, patch),
+    delete: (id: string) => invoke('formula-rules:delete', id),
+    test: (expression: string, sampleContext?: unknown) =>
+      invoke('formula-rules:test', expression, sampleContext),
+    evaluate: (ruleId: string, ctx?: unknown) =>
+      invoke('formula-rules:evaluate', ruleId, ctx),
+    seedStarters: () => invoke('formula-rules:seed-starters')
+  },
+
+  // ── Spreadsheet Templates (imported workbook metadata) ───
+  spreadsheets: {
+    list: () => invoke('spreadsheet-templates:list'),
+    get: (id: string) => invoke('spreadsheet-templates:get', id),
+    delete: (id: string) => invoke('spreadsheet-templates:delete', id),
+    analyze: (filePath: string) => invoke('spreadsheet-templates:analyze', filePath),
+    importLedger: (filePath: string, sheetName: string, academicYearId?: string) =>
+      invoke('spreadsheet-templates:import-ledger', filePath, sheetName, academicYearId),
+    importComments: (filePath: string, sheetName: string) =>
+      invoke('spreadsheet-templates:import-comments', filePath, sheetName)
+  },
+
   // Channel reference (for advanced use)
   channels: IPC
 } as const;
