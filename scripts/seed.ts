@@ -324,6 +324,6 @@ async function seed() {
   }
   console.log(`[seed] Audit logs: ${auditActions.length}`);
 
-  console.log('\n[seed] ✅ Done. Database is ready.');
+  console.log('\n[seed]  Done. Database is ready.');
   console.log(`[seed] DB path: ${DB_FILE}`);
 }

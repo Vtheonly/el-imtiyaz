@@ -39,7 +39,7 @@ Next time you `git push`, Git will ask for username + password. Use:
 ```bash
 git remote set-url origin https://Vtheonly:<YOUR_PAT>@github.com/Vtheonly/el-imtiyaz-school-system.git
 ```
-⚠️ This stores the token in plaintext in `.git/config`. Don't do this if the repo will be shared.
+ This stores the token in plaintext in `.git/config`. Don't do this if the repo will be shared.
 
 ---
 

@@ -769,9 +769,9 @@ const ROUTES = [
         path: path.join(SHOTS_DIR, `${route.name}.png`),
         fullPage: false
       });
-      console.log(`[harness]   ✅ ${route.name}.png`);
+      console.log(`[harness]    ${route.name}.png`);
     } catch (err) {
-      console.error(`[harness]   ❌ ${route.name}: ${err.message}`);
+      console.error(`[harness]    ${route.name}: ${err.message}`);
       // Still try to take a screenshot to capture the error state
       try {
         await page.screenshot({ path: path.join(SHOTS_DIR, `${route.name}-error.png`) });

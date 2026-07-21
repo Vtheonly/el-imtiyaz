@@ -41,12 +41,12 @@ The project follows a **clean architecture** with explicit layers and one-way de
 │  Renderer (React + Vite)                                    │
 │  ─────────────────────────────────────────────────────────  │
 │  Pages · Components · State · Hooks                         │
-│  ↕ (window.elImtiyaz — typed API)                          │
+│   (window.elImtiyaz — typed API)                          │
 ├─────────────────────────────────────────────────────────────┤
 │  Preload (contextBridge)                                    │
 │  ─────────────────────────────────────────────────────────  │
 │  Whitelisted IPC channels only                              │
-│  ↕ (ipcRenderer.invoke)                                    │
+│   (ipcRenderer.invoke)                                    │
 ├─────────────────────────────────────────────────────────────┤
 │  Main Process                                               │
 │  ─────────────────────────────────────────────────────────  │
@@ -73,23 +73,23 @@ The project follows a **clean architecture** with explicit layers and one-way de
 
 | Module | Status | Description |
 |---|---|---|
-| Student Management | ✅ | Full CRUD, documents, financial profile, payment timeline |
-| Parent Management | ✅ | One parent → many students |
-| Payment System | ✅ | DZD, installments, multiple payment methods (cash, cheque, BaridiMob…) |
-| Invoice System | ✅ | Auto-generated invoice numbers, partial payment tracking |
-| Debt Management | ✅ | School-wide debt dashboard, overdue detection, largest debtors |
-| Academic Years | ✅ | Semester / Trimester / Quarter / Month structures auto-generated |
-| Classes | ✅ | Capacity enforcement, enrolment tracking |
-| Attendance | ✅ | Daily recording, per-student rate, per-class reports |
-| Employees | ✅ | Role-based permissions (Super Admin / Administrator / Accountant / Receptionist / Teacher / Viewer) |
-| Fee Templates | ✅ | Reusable charge plans, bulk apply to many students |
-| Scholarships | ✅ | Full / partial, sibling discounts auto-computed, revocable |
-| Receipt Generator | ✅ | PDF + QR code, professional layout |
-| Audit Logs | ✅ | Append-only, every mutation logged with before/after |
-| Reports | ✅ | Revenue (daily/weekly/monthly/yearly), outstanding, per-student |
-| Export | ✅ | PDF (pdfmake), Excel (ExcelJS), CSV (Papa Parse) |
-| **Workflow Builder** | ✅ | **Drag-and-drop node graph, 15+ node types, execution engine, versioning** |
-| **Notification Center** | ✅ | **In-app, email, SMS, WhatsApp templates with auto-subscription to domain events** |
+| Student Management |  | Full CRUD, documents, financial profile, payment timeline |
+| Parent Management |  | One parent → many students |
+| Payment System |  | DZD, installments, multiple payment methods (cash, cheque, BaridiMob…) |
+| Invoice System |  | Auto-generated invoice numbers, partial payment tracking |
+| Debt Management |  | School-wide debt dashboard, overdue detection, largest debtors |
+| Academic Years |  | Semester / Trimester / Quarter / Month structures auto-generated |
+| Classes |  | Capacity enforcement, enrolment tracking |
+| Attendance |  | Daily recording, per-student rate, per-class reports |
+| Employees |  | Role-based permissions (Super Admin / Administrator / Accountant / Receptionist / Teacher / Viewer) |
+| Fee Templates |  | Reusable charge plans, bulk apply to many students |
+| Scholarships |  | Full / partial, sibling discounts auto-computed, revocable |
+| Receipt Generator |  | PDF + QR code, professional layout |
+| Audit Logs |  | Append-only, every mutation logged with before/after |
+| Reports |  | Revenue (daily/weekly/monthly/yearly), outstanding, per-student |
+| Export |  | PDF (pdfmake), Excel (ExcelJS), CSV (Papa Parse) |
+| **Workflow Builder** |  | **Drag-and-drop node graph, 15+ node types, execution engine, versioning** |
+| **Notification Center** |  | **In-app, email, SMS, WhatsApp templates with auto-subscription to domain events** |
 
 ---
 
@@ -295,4 +295,4 @@ Use `formatDZD(amount)` in the renderer for display, and `Money.from(amount)` in
 
 ## License
 
-MIT © El-Imtiyaz Engineering
+MIT  El-Imtiyaz Engineering
