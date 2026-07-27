@@ -16,6 +16,10 @@ import { Label } from "../../shared/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../shared/ui/card";
 import { cn } from "../../shared/ui/cn";
 
+
+
+
+// ggignore
 const DEMO_ACCOUNTS = [
   { email: "admin@elimtiyaz.dz", password: "admin123", role: "Super Administrateur", icon: Shield, color: "text-primary" },
   { email: "financial@elimtiyaz.dz", password: "fin123", role: "Agent Financier", icon: Wallet, color: "text-status-success" },
