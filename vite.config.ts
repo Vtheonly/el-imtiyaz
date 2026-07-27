@@ -1,48 +1,38 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { resolve } from "path";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-// Vite configures the renderer (React) layer of the Electron app.
-// The main process and preload are compiled separately via tsc.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
-  root: "src/ui",
+  plugins: [react()],
   base: "./",
-  mode: process.env.NODE_ENV === "production" ? "production" : "development",
   resolve: {
     alias: {
-      "@ui": resolve(__dirname, "src/ui"),
-      "@core": resolve(__dirname, "src/core"),
-      "@shared": resolve(__dirname, "src/shared"),
-      "@services": resolve(__dirname, "src/services"),
-      "@infra": resolve(__dirname, "src/infrastructure"),
-    },
-  },
-  plugins: [react()],
-  server: {
-    port: 5173,
-    strictPort: true,
-    hmr: {
-      port: 5174,
+      "@": path.resolve(__dirname, "./src"),
+      "@app": path.resolve(__dirname, "./src/app"),
+      "@core": path.resolve(__dirname, "./src/core"),
+      "@domain": path.resolve(__dirname, "./src/domain"),
+      "@infra": path.resolve(__dirname, "./src/infrastructure"),
+      "@shared": path.resolve(__dirname, "./src/shared"),
+      "@features": path.resolve(__dirname, "./src/features"),
+      "@layouts": path.resolve(__dirname, "./src/layouts"),
+      "@config": path.resolve(__dirname, "./src/config"),
     },
   },
   build: {
-    outDir: resolve(__dirname, "dist/renderer"),
+    outDir: "dist",
     emptyOutDir: true,
-    target: "esnext",
     sourcemap: true,
+    target: "es2022",
     rollupOptions: {
-      input: {
-        index: resolve(__dirname, "src/ui/index.html"),
-      },
+      input: path.resolve(__dirname, "index.html"),
     },
   },
-  optimizeDeps: {
-    include: [
-      "react",
-      "react-dom",
-      "react-router-dom",
-      "@reduxjs/toolkit",
-      "react-redux",
-    ],
+  server: {
+    port: 5173,
+    strictPort: true,
   },
 });
