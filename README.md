@@ -1,3 +1,5 @@
+this is the old one
+
 # El-Imtiyaz School System
 
 > A professional, offline-first desktop administration system for **El-Imtiyaz Private School**. Built with Electron, React, TypeScript, and SQLite. All financial amounts in **Algerian Dinar (DZD)**.
