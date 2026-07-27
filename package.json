@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && tsc -p electron/tsconfig.json && cross-env NODE_ENV=development electron .\"",
     "electron:build": "vite build && tsc -p electron/tsconfig.json && electron-builder",
-    "start": "electron ."
+    "start": "electron . --no-sandbox"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -43,8 +43,10 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "i18next": "^24.2.0",
     "lucide-react": "^0.468.0",
+    "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",
