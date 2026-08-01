@@ -272,18 +272,18 @@ Addressed the audit findings from iteration 4:
 ### Test results
 
 ```
-✓ src/test/component/page-tabs.test.tsx          (15 tests)
-✓ src/test/component/unified-modal.test.tsx       (19 tests)
-✓ src/test/integration/ledger-integration.test.ts (17 tests)
-✓ src/test/integration/mock-repositories.test.ts   (22 tests)
-✓ src/test/unit/academic.test.ts                   (21 tests)
-✓ src/test/unit/currency.test.ts                   (19 tests)
-✓ src/test/unit/dynamic-import.test.ts             (20 tests)
-✓ src/test/unit/ledger.test.ts                     (50 tests)
-✓ src/test/unit/payment.test.ts                    (14 tests)
-✓ src/test/unit/pricing.test.ts                    (17 tests)
-✓ src/test/unit/rbac-feature-gate.test.ts          (16 tests)
-✓ src/test/unit/result.test.ts                     (15 tests)
+ src/test/component/page-tabs.test.tsx          (15 tests)
+ src/test/component/unified-modal.test.tsx       (19 tests)
+ src/test/integration/ledger-integration.test.ts (17 tests)
+ src/test/integration/mock-repositories.test.ts   (22 tests)
+ src/test/unit/academic.test.ts                   (21 tests)
+ src/test/unit/currency.test.ts                   (19 tests)
+ src/test/unit/dynamic-import.test.ts             (20 tests)
+ src/test/unit/ledger.test.ts                     (50 tests)
+ src/test/unit/payment.test.ts                    (14 tests)
+ src/test/unit/pricing.test.ts                    (17 tests)
+ src/test/unit/rbac-feature-gate.test.ts          (16 tests)
+ src/test/unit/result.test.ts                     (15 tests)
 
 Test Files  12 passed (12)
      Tests  273 passed (273)
@@ -313,9 +313,9 @@ verify:
 ## Build verification
 
 ```
-✓ tsc --noEmit                          (clean)
-✓ vite build                            (11.21s, 10 chunks)
-✓ vitest run                            (273/273 tests pass)
+ tsc --noEmit                          (clean)
+ vite build                            (11.21s, 10 chunks)
+ vitest run                            (273/273 tests pass)
 ```
 
 CSS bundle: **34.50 kB** (7.20 kB gzipped) — proper Tailwind compilation.
@@ -338,35 +338,35 @@ CSS bundle: **34.50 kB** (7.20 kB gzipped) — proper Tailwind compilation.
 
 ## Plan compliance highlights
 
-- ✅ "Every piece of financial data must come from a single source of truth" —
+-  "Every piece of financial data must come from a single source of truth" —
   `LedgerEntry` is the single source. Every balance is computed by replay.
-- ✅ "Any value that represents a balance, debt, payment, or amount owed must
+-  "Any value that represents a balance, debt, payment, or amount owed must
   be shared consistently across the entire application" — Dashboard KPI,
   Financials debt tab, and Parent drawer all read from `computeParentSummary()`.
   Smoke test confirms identical numbers (e.g., Karim Benali: 66,600 DZD everywhere).
-- ✅ "Every number must be derived from accurate calculations rather than
+-  "Every number must be derived from accurate calculations rather than
   manually entered or duplicated values" — All hardcoded constants in
   `mock-repositories.ts`, `see-details-modal.tsx`, `financials-page.tsx`,
   and `pricing-tab.tsx` have been replaced with computed values.
-- ✅ "Every calculation must be traceable and reproducible" — Every
+-  "Every calculation must be traceable and reproducible" — Every
   `LedgerEntry` carries `actorId`, `actorName`, `at`, `description`,
   `sourceType`, `sourceId`, and `metadata`. Reconciliation verifies integrity.
-- ✅ "The application should function like a proper accounting system" —
+-  "The application should function like a proper accounting system" —
   Ledger-based, immutable entries, reversal (not deletion), reconciliation.
-- ✅ "Build a comprehensive validation engine" — `reconcile.ts` with 10 checks.
-- ✅ "Excel importer should be generic, schema-driven, not hardcoded" —
+-  "Build a comprehensive validation engine" — `reconcile.ts` with 10 checks.
+-  "Excel importer should be generic, schema-driven, not hardcoded" —
   `dynamic-import.ts` engine + `client-schema.ts` schema. No file-specific logic.
-- ✅ "Be easy to extend if additional columns are added" — Add a `ColumnSpec`
+-  "Be easy to extend if additional columns are added" — Add a `ColumnSpec`
   to the schema. No engine code changes.
-- ✅ "Handle large datasets efficiently" — Streaming `eachRow` API, 1000-row
+-  "Handle large datasets efficiently" — Streaming `eachRow` API, 1000-row
   test completes in < 5s, `maxRows` safety cap (default 100k).
-- ✅ "All modals unified" — Verified by audit: 17/17 modal sites use
+-  "All modals unified" — Verified by audit: 17/17 modal sites use
   `UnifiedModal` (only documented exception: Cmd+K search palette).
-- ✅ "Tab navigation modern, polished, consistent" — Icons on all tabs,
+-  "Tab navigation modern, polished, consistent" — Icons on all tabs,
   count badges on 7 tabs across 5 pages.
-- ✅ `tsc --noEmit` clean
-- ✅ `vite build` succeeds
-- ✅ `vitest run` — 273/273 pass
+-  `tsc --noEmit` clean
+-  `vite build` succeeds
+-  `vitest run` — 273/273 pass
 
 ## Remaining work (iteration 6+)
 

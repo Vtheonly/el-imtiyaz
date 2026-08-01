@@ -11,20 +11,20 @@
 
 ---
 
-## Iteration 2 — COMPLETED ✅
+## Iteration 2 — COMPLETED 
 
-- ✅ Admin Pricing Configuration panel (P0) — `PricingConfig` entity, repository, Settings tab, full CRUD
-- ✅ CRM Batch Registration modal (P1) — 4-step atomic wizard
-- ✅ CRM Parent Detail Drawer (P1) — 4 sections, account adjustment modal
-- ✅ Financials Counter Payment Modal (P1) — proof capture, receipt preview
-- ✅ Financials Expense submit + detail with workflow (P1) — full Approve/Reject/Disburse/Settle
-- ✅ Financials Installment Schedule tab (P2) — replaces ComingSoonCard
-- ✅ Academics Class Detail page (P1) — 4 tabs
-- ✅ Academics Roll Call screen (P1) — 30-second workflow with P/AE/AN/R
-- ✅ Academics Grade Entry screen (P1) — inline-editable with live average recompute
-- ✅ Academics Homework Push modal (P2)
-- ✅ Personnel Detail Drawer (P2) — identity + weekly hours
-- ✅ Personnel Releve tab (P2) — clock-in/out form
+-  Admin Pricing Configuration panel (P0) — `PricingConfig` entity, repository, Settings tab, full CRUD
+-  CRM Batch Registration modal (P1) — 4-step atomic wizard
+-  CRM Parent Detail Drawer (P1) — 4 sections, account adjustment modal
+-  Financials Counter Payment Modal (P1) — proof capture, receipt preview
+-  Financials Expense submit + detail with workflow (P1) — full Approve/Reject/Disburse/Settle
+-  Financials Installment Schedule tab (P2) — replaces ComingSoonCard
+-  Academics Class Detail page (P1) — 4 tabs
+-  Academics Roll Call screen (P1) — 30-second workflow with P/AE/AN/R
+-  Academics Grade Entry screen (P1) — inline-editable with live average recompute
+-  Academics Homework Push modal (P2)
+-  Personnel Detail Drawer (P2) — identity + weekly hours
+-  Personnel Releve tab (P2) — clock-in/out form
 
 ---
 

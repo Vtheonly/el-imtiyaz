@@ -117,7 +117,7 @@ describe("parseDzd", () => {
   });
 });
 
-describe("formatDzd ↔ parseDzd round-trip", () => {
+describe("formatDzd  parseDzd round-trip", () => {
   it("parseDzd(formatDzd(x)) === x for integer amounts", () => {
     for (const x of [0, 1, 100, 12500, 1_000_000]) {
       expect(parseDzd(formatDzd(x))).toBe(x);

@@ -125,7 +125,7 @@ Plus `see-details-modal.tsx` uses `PageTabs variant="underline"` for its
 
 ## Iteration 3 features — all completed
 
-### A. CRM Student Detail Drawer — P1 ✅
+### A. CRM Student Detail Drawer — P1 
 
 Plan §04.05 / §04.07 — 4-tab slide-over:
 
@@ -138,7 +138,7 @@ New file: `src/features/crm/student-detail-drawer.tsx`
 Built on `UnifiedModal variant="drawer"` + `PageTabs variant="underline"`.
 Bidirectional navigation: from student → parent drawer, from parent → student drawer.
 
-### B. Receipt PDF generation — P1 ✅
+### B. Receipt PDF generation — P1 
 
 Plan §07.05 — two formats auto-generated on payment:
 
@@ -153,7 +153,7 @@ Uses `pdf-lib` (MIT, no native deps, runs in browser + Node).
 No manual "Generate Receipt" button — PDFs are downloadable from the
 Receipts tab and from the counter-payment success stage.
 
-### C. Excel bulk import pipeline — P1 ✅
+### C. Excel bulk import pipeline — P1 
 
 Plan §14 — 5-step desktop-only pipeline:
 
@@ -171,7 +171,7 @@ Uses `exceljs` (restricted to infrastructure/excel/ per plan §14).
 Drag-and-drop file selection, full preview with validation errors,
 audit-logged atomic insert.
 
-### D. Report export engine — P1 ✅
+### D. Report export engine — P1 
 
 Plan §15 — three report types + audit log export:
 
@@ -189,7 +189,7 @@ Wired into:
 - Settings → Audit Log tab (XLSX + CSV export buttons)
 - Financials → Receipts tab (PDF generation)
 
-### E. Subjects directory + assignment — P2 ✅
+### E. Subjects directory + assignment — P2 
 
 Plan §05 — Subject CRUD + class-subject assignment:
 
@@ -211,7 +211,7 @@ All three implemented in `MockSubjectRepository` with audit logging.
 New audit actions (added to `AuditActions`):
 - `subject.create`, `subject.update`, `subject.archive`
 
-### F. Homework history tab — P2 ✅
+### F. Homework history tab — P2 
 
 Plan §06 — replaces ComingSoonCard:
 
@@ -223,7 +223,7 @@ Plan §06 — replaces ComingSoonCard:
 
 New file: `src/features/academics/homework-history-tab.tsx`
 
-### G. Class detail tabs deep — P2 ✅
+### G. Class detail tabs deep — P2 
 
 Replaced all three placeholder tabs in Class Detail page:
 
@@ -239,13 +239,13 @@ New files:
 - `src/features/academics/class-attendance-tab.tsx`
 - `src/features/academics/class-grades-tab.tsx`
 
-### H. Audit log CSV/XLSX export — P2 ✅
+### H. Audit log CSV/XLSX export — P2 
 
 The Settings → Audit Log "Export CSV/XLSX" button is now wired to a real
 export using `exportAuditLog()` from the report engine. Dropdown menu
 lets the user choose between XLSX (Excel) and CSV formats.
 
-### I. RBAC Matrix editor — P2 ✅
+### I. RBAC Matrix editor — P2 
 
 Plan §02.07 — replaced the read-only matrix with an editable one:
 
@@ -258,7 +258,7 @@ Plan §02.07 — replaced the read-only matrix with an editable one:
 
 New file: `src/features/settings/rbac-matrix-editor.tsx`
 
-### J. Profile screen — P2 ✅
+### J. Profile screen — P2 
 
 New route: `/profile`
 
@@ -327,9 +327,9 @@ In `core/audit/audit-actions.ts`:
 ## Build verification
 
 ```
-✓ tsc --noEmit           (clean)
-✓ vite build             (2.6 MB bundle, 799 KB gzipped, 11.00s)
-✓ electron tsc            (clean)
+ tsc --noEmit           (clean)
+ vite build             (2.6 MB bundle, 799 KB gzipped, 11.00s)
+ electron tsc            (clean)
 ```
 
 Bundle grew from iteration 2 (1.12 MB) due to pdf-lib + exceljs
@@ -340,24 +340,24 @@ add `manualChunks` in Vite config to split vendor libraries
 
 ## Plan compliance highlights
 
-- ✅ "All modals throughout the application must be completely unified" —
+-  "All modals throughout the application must be completely unified" —
   UnifiedModal primitive + refactored 5 existing modals + aligned drawer.tsx
-- ✅ "Redesign the tab navigation to look more modern, polished, and
+-  "Redesign the tab navigation to look more modern, polished, and
   professional" — PageTabs primitive with 3 variants + refactored 7 pages
-- ✅ Student detail drawer opens from CRM student list, shows all 4 tabs (§04.05)
-- ✅ Receipt PDF generates automatically on payment creation (§07.05)
-- ✅ Excel bulk import pipeline accepts .xlsx, validates, atomic-inserts (§14)
-- ✅ Report export engine produces XLSX/CSV for revenue/debt/roster reports (§15)
-- ✅ Subjects directory supports create/edit/archive with coefficient changes (§05)
-- ✅ Class-subject assignment works (teacher + weeklyHours + coefficient) (§05)
-- ✅ Homework history tab lists past assignments with re-push button (§06)
-- ✅ Class detail Subjects/Attendance/Grades tabs render live data (§05)
-- ✅ Audit log CSV/XLSX export button works (§12)
-- ✅ RBAC matrix editor allows SuperAdmin to modify role → permission mapping (§02.07)
-- ✅ Profile screen shows user info + permission grid + recent activity
-- ✅ All new mutations write audit log entries
-- ✅ `tsc --noEmit` clean
-- ✅ `vite build` succeeds
+-  Student detail drawer opens from CRM student list, shows all 4 tabs (§04.05)
+-  Receipt PDF generates automatically on payment creation (§07.05)
+-  Excel bulk import pipeline accepts .xlsx, validates, atomic-inserts (§14)
+-  Report export engine produces XLSX/CSV for revenue/debt/roster reports (§15)
+-  Subjects directory supports create/edit/archive with coefficient changes (§05)
+-  Class-subject assignment works (teacher + weeklyHours + coefficient) (§05)
+-  Homework history tab lists past assignments with re-push button (§06)
+-  Class detail Subjects/Attendance/Grades tabs render live data (§05)
+-  Audit log CSV/XLSX export button works (§12)
+-  RBAC matrix editor allows SuperAdmin to modify role → permission mapping (§02.07)
+-  Profile screen shows user info + permission grid + recent activity
+-  All new mutations write audit log entries
+-  `tsc --noEmit` clean
+-  `vite build` succeeds
 
 ## Demo accounts (unchanged)
 

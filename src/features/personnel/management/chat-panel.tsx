@@ -353,7 +353,7 @@ export function ChatPanel() {
                               <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
                             )}
                             {m.voiceNoteSeconds != null && (
-                              <p className="text-[10px] opacity-70 mt-1">🎤 Note vocale ({m.voiceNoteSeconds}s)</p>
+                              <p className="text-[10px] opacity-70 mt-1"> Note vocale ({m.voiceNoteSeconds}s)</p>
                             )}
                           </div>
                           <div className={`flex items-center gap-2 mt-0.5 ${isOwn ? "justify-end" : ""}`}>

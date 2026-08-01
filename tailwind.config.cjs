@@ -1,7 +1,7 @@
 /**
  * Tailwind CSS configuration for El-Imtiyaz Desktop.
  *
- * ⚠️ CRITICAL: This file MUST be committed to the repository.
+ *  CRITICAL: This file MUST be committed to the repository.
  * The root `.gitignore` historically excluded `tailwind.config.js` and
  * `postcss.config.js`, which silently broke the CSS pipeline (only ~3.36 kB
  * of `@layer` blocks were emitted, no compiled utilities). See

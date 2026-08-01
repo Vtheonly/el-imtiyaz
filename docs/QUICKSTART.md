@@ -149,17 +149,17 @@ The app launches in **MOCK mode** (default).
    - **IA**: enter Groq API key (from https://console.groq.com/keys)
    - **Sauvegardes**: enter backup passphrase (32+ chars)
 
-## Done! 🎉
+## Done! 
 
 You now have:
-- ✅ Supabase backend running
-- ✅ 50+ database tables with RLS
-- ✅ 11 Edge Functions deployed
-- ✅ 4 cron jobs scheduled
-- ✅ 10 storage buckets
-- ✅ Desktop app connected to Supabase
-- ✅ SuperAdmin account configured
-- ✅ All settings configurable from the UI
+-  Supabase backend running
+-  50+ database tables with RLS
+-  11 Edge Functions deployed
+-  4 cron jobs scheduled
+-  10 storage buckets
+-  Desktop app connected to Supabase
+-  SuperAdmin account configured
+-  All settings configurable from the UI
 
 ## Next Steps
 

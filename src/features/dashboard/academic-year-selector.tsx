@@ -160,7 +160,7 @@ export function AcademicYearSelector({
               )}
             >
               <span className="font-mono text-xs">{year}</span>
-              {year === value.academicYear && <span className="text-[10px]">✓</span>}
+              {year === value.academicYear && <span className="text-[10px]"></span>}
             </DropdownMenuItem>
           ))}
 
@@ -176,7 +176,7 @@ export function AcademicYearSelector({
               )}
             >
               <span className="text-xs">{PRESET_LABELS_FR[preset]}</span>
-              {value.preset === preset && <span className="text-[10px]">✓</span>}
+              {value.preset === preset && <span className="text-[10px]"></span>}
             </DropdownMenuItem>
           ))}
 

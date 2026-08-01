@@ -1690,7 +1690,7 @@ mindmap
 | [[01. Parent-First Entity Dependency]] | Why students cannot be orphans. |
 | [[02. Unlimited 1 to N Children Model]] | The unlimited family size rule. |
 | [[03. Dynamic Batch Registration Workflow]] | The 4-step atomic batch flow. |
-| [[04. Bidirectional Relational Navigation]] | Parent ↔ Student cross-links. |
+| [[04. Bidirectional Relational Navigation]] | Parent  Student cross-links. |
 | [[05. Parent Profile Drawer]] | What shows when you open a parent. |
 | [[06. Student Profile Drawer]] | What shows when you open a student. |
 
@@ -7148,7 +7148,7 @@ tags:
 | Note | Purpose |
 | :--- | :--- |
 | [[01. Glossary of Terms]] | Definitions of platform-specific terms. |
-| [[02. French Terminology Mapping]] | English ↔ French term mapping. |
+| [[02. French Terminology Mapping]] | English  French term mapping. |
 | [[03. Color Tokens Quick Reference]] | The full color palette in one table. |
 | [[04. Status Codes Reference]] | All status enums used in the platform. |
 
@@ -7229,7 +7229,7 @@ tags:
 
 Developers and staff who only read English need to recognize French terms in code, UI strings, and conversations. This mapping prevents confusion.
 
-## English ↔ French mapping
+## English  French mapping
 
 | English | French | Notes |
 | :--- | :--- | :--- |

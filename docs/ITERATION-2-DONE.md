@@ -153,25 +153,25 @@ New route: `/academics/class/:classId/grades/:subjectId`
 ## Build verification
 
 ```
-✓ tsc --noEmit           (clean)
-✓ vite build             (1.12 MB bundle, 30 kB CSS — grew from iteration 1)
+ tsc --noEmit           (clean)
+ vite build             (1.12 MB bundle, 30 kB CSS — grew from iteration 1)
 ```
 
 ## Plan compliance highlights
 
-- ✅ "All pricing must be configurable by administrators. Never hardcode payment values." — PricingRepository is the single source of truth, admin-editable via UI
-- ✅ Parent-first dependency (§04.01) — Batch Registration modal enforces parent creation before children
-- ✅ Unlimited children (§04.02) — "Add Another Child" button, no upper bound
-- ✅ Atomic batch registration (§04.03) — single transaction with audit log
-- ✅ 3-tranche tuition (§07.03) — auto-computed via `tuitionTranches()` helper
-- ✅ Proof mandatory for Check/Transfer (§18.03) — enforced in Counter Payment modal
-- ✅ No self-approval (§08) — Approve button hidden if `session.userId === expense.submittedBy`
-- ✅ Receipt auto-generation (§07.05) — no manual "Generate Receipt" button
-- ✅ Exactly 4 attendance statuses (§09.02) — no 5th "CUSTOM" allowed
-- ✅ 3+ absence threshold alert (§09.03) — `alertAbsences()` called on every non-Present save
-- ✅ Anomaly is signal not verdict (§11) — banner says "l'humain décide toujours"
-- ✅ Salary visibility restricted (§09.04) — only SuperAdmin + FinOfficer see salary field
-- ✅ Account Adjustments replace scholarships (§07.04) — reason + admin note mandatory
+-  "All pricing must be configurable by administrators. Never hardcode payment values." — PricingRepository is the single source of truth, admin-editable via UI
+-  Parent-first dependency (§04.01) — Batch Registration modal enforces parent creation before children
+-  Unlimited children (§04.02) — "Add Another Child" button, no upper bound
+-  Atomic batch registration (§04.03) — single transaction with audit log
+-  3-tranche tuition (§07.03) — auto-computed via `tuitionTranches()` helper
+-  Proof mandatory for Check/Transfer (§18.03) — enforced in Counter Payment modal
+-  No self-approval (§08) — Approve button hidden if `session.userId === expense.submittedBy`
+-  Receipt auto-generation (§07.05) — no manual "Generate Receipt" button
+-  Exactly 4 attendance statuses (§09.02) — no 5th "CUSTOM" allowed
+-  3+ absence threshold alert (§09.03) — `alertAbsences()` called on every non-Present save
+-  Anomaly is signal not verdict (§11) — banner says "l'humain décide toujours"
+-  Salary visibility restricted (§09.04) — only SuperAdmin + FinOfficer see salary field
+-  Account Adjustments replace scholarships (§07.04) — reason + admin note mandatory
 
 ## Demo accounts (unchanged from iteration 1)
 

@@ -314,15 +314,15 @@ same iteration; the fix is documented in the function's JSDoc.
 ### Test results
 
 ```
-✓ src/test/component/page-tabs.test.tsx        (15 tests)
-✓ src/test/component/unified-modal.test.tsx    (19 tests)
-✓ src/test/integration/mock-repositories.test.ts (22 tests)
-✓ src/test/unit/academic.test.ts               (21 tests)
-✓ src/test/unit/currency.test.ts               (19 tests)
-✓ src/test/unit/payment.test.ts                (14 tests)
-✓ src/test/unit/pricing.test.ts                (17 tests)
-✓ src/test/unit/rbac-feature-gate.test.ts      (16 tests)
-✓ src/test/unit/result.test.ts                 (15 tests)
+ src/test/component/page-tabs.test.tsx        (15 tests)
+ src/test/component/unified-modal.test.tsx    (19 tests)
+ src/test/integration/mock-repositories.test.ts (22 tests)
+ src/test/unit/academic.test.ts               (21 tests)
+ src/test/unit/currency.test.ts               (19 tests)
+ src/test/unit/payment.test.ts                (14 tests)
+ src/test/unit/pricing.test.ts                (17 tests)
+ src/test/unit/rbac-feature-gate.test.ts      (16 tests)
+ src/test/unit/result.test.ts                 (15 tests)
 
 Test Files  9 passed (9)
      Tests  158 passed (158)
@@ -383,9 +383,9 @@ documented and the chunk loads lazily).
 ## Build verification
 
 ```
-✓ tsc --noEmit                          (clean)
-✓ vite build                            (11.32s, 10 chunks)
-✓ vitest run                            (158/158 tests pass)
+ tsc --noEmit                          (clean)
+ vite build                            (11.32s, 10 chunks)
+ vitest run                            (158/158 tests pass)
 ```
 
 CSS bundle size after the Tailwind config fix: **34.34 kB** (7.18 kB gzipped) —

@@ -6,7 +6,7 @@
 -- Per plan §04:
 --   - Parent-first: student cannot exist without parent (parent_id NOT NULL FK)
 --   - Unlimited 1→N children (no 4-child cap)
---   - Bidirectional navigation (parent ↔ student)
+--   - Bidirectional navigation (parent  student)
 --   - Activation codes: 6-7 digit, single-use, bind to exactly one parent profile
 --   - Soft-delete (deleted_at); RLS hides deleted rows
 -- ============================================================================

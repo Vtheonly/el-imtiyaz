@@ -639,7 +639,7 @@ describe("MockChatRepository", () => {
   it("creates a direct channel", async () => {
     const result = await mockChatRepository.createChannel({
       type: "direct",
-      name: "DM per-001 ↔ per-002",
+      name: "DM per-001  per-002",
       description: null,
       memberIds: ["per-001", "per-002"],
       departmentId: null,

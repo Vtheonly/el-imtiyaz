@@ -626,24 +626,24 @@ All 5 added to `PERMISSION_LABELS_FR` with French labels. `DEFAULT_ROLE_PERMISSI
 
 | Plan requirement | Status | Evidence |
 |---|---|---|
-| Unified Modal System — 100% consistent | ✅ | 0 raw `<Dialog>` call sites; Cmd+K migrated to `variant="command-palette"` |
-| Tab Navigation — modern, polished, professional | ✅ | Sliding ink-bar + sliding pill + density prop + iconPosition + logical CSS for RTL |
-| P3-K AI integration (Groq + OpenRouter + BYOK) | ✅ | AIConfigRepository + ai-config-storage (encrypted) + 3 features (narrative, drafting, anomaly) + PII masking + mock LLM adapter |
-| P3-L Workflow DAG editor | ✅ | SVG canvas + 17-node palette + Kahn's algorithm + save validation + deploy stub |
-| P3-M AES-256 Backup system | ✅ | Web Crypto AES-256-GCM + IndexedDB vault + 365-day retention + point-in-time restore UI + 24h scheduler |
-| P3-N Personnel Workflow Monitor | ✅ | Read-only run list + detail drawer with per-node timeline |
-| P3-O Arabic RTL polish | ✅ | Language switcher + `initLocale()` + logical CSS properties throughout |
-| P3-R Search index improvements | ✅ | 6 entity types (was 2) + recent searches persisted to localStorage (max 8, FIFO) |
-| PII masking before AI calls | ✅ | `maskPII` / `unmaskPII` with 6 patterns; narrative + drafting + anomaly features all mask before LLM call |
-| Teacher review mandatory (narratives) | ✅ | "Approuver" button must be explicitly clicked; narrative is never auto-published |
-| Human review required (drafting) | ✅ | Warning alert "L'IA peut halluciner. Relisez avant d'envoyer." |
-| Anomaly is signal not verdict | ✅ | Info alert "L'IA fournit un signal, l'humain décide toujours." |
-| AES-256-GCM (never CBC/CTR without MAC) | ✅ | Uses Web Crypto AES-256-GCM with auth tag verification |
-| PBKDF2 ≥ 100,000 iterations | ✅ | `BACKUP_PBKDF2_ITERATIONS = 100_000` |
-| 365-day rolling retention | ✅ | `BACKUP_RETENTION_DAYS = 365` + `purgeExpired` enforces it |
-| Kahn's algorithm on every save | ✅ | `handleSave` calls `detectCycle` before persisting; cycle blocks save |
-| 2-click confirmation for manual triggers | ✅ | "Déployer" + "Exécuter" both use `ConfirmModal` |
-| Comprehensive testing | ✅ | 393 tests passing (330 baseline + 63 new) across unit / integration / component / property / stress / edge case / error recovery |
+| Unified Modal System — 100% consistent |  | 0 raw `<Dialog>` call sites; Cmd+K migrated to `variant="command-palette"` |
+| Tab Navigation — modern, polished, professional |  | Sliding ink-bar + sliding pill + density prop + iconPosition + logical CSS for RTL |
+| P3-K AI integration (Groq + OpenRouter + BYOK) |  | AIConfigRepository + ai-config-storage (encrypted) + 3 features (narrative, drafting, anomaly) + PII masking + mock LLM adapter |
+| P3-L Workflow DAG editor |  | SVG canvas + 17-node palette + Kahn's algorithm + save validation + deploy stub |
+| P3-M AES-256 Backup system |  | Web Crypto AES-256-GCM + IndexedDB vault + 365-day retention + point-in-time restore UI + 24h scheduler |
+| P3-N Personnel Workflow Monitor |  | Read-only run list + detail drawer with per-node timeline |
+| P3-O Arabic RTL polish |  | Language switcher + `initLocale()` + logical CSS properties throughout |
+| P3-R Search index improvements |  | 6 entity types (was 2) + recent searches persisted to localStorage (max 8, FIFO) |
+| PII masking before AI calls |  | `maskPII` / `unmaskPII` with 6 patterns; narrative + drafting + anomaly features all mask before LLM call |
+| Teacher review mandatory (narratives) |  | "Approuver" button must be explicitly clicked; narrative is never auto-published |
+| Human review required (drafting) |  | Warning alert "L'IA peut halluciner. Relisez avant d'envoyer." |
+| Anomaly is signal not verdict |  | Info alert "L'IA fournit un signal, l'humain décide toujours." |
+| AES-256-GCM (never CBC/CTR without MAC) |  | Uses Web Crypto AES-256-GCM with auth tag verification |
+| PBKDF2 ≥ 100,000 iterations |  | `BACKUP_PBKDF2_ITERATIONS = 100_000` |
+| 365-day rolling retention |  | `BACKUP_RETENTION_DAYS = 365` + `purgeExpired` enforces it |
+| Kahn's algorithm on every save |  | `handleSave` calls `detectCycle` before persisting; cycle blocks save |
+| 2-click confirmation for manual triggers |  | "Déployer" + "Exécuter" both use `ConfirmModal` |
+| Comprehensive testing |  | 393 tests passing (330 baseline + 63 new) across unit / integration / component / property / stress / edge case / error recovery |
 
 ---
 
