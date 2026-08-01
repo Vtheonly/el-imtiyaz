@@ -1,3 +1,5 @@
+last before complete refactore v3
+
 # El-Imtiyaz Platform — Complete Backend Configuration Package
 
 This package contains the complete El-Imtiyaz educational management platform with full Supabase backend integration. **Everything you need to configure and connect the backend is included.**
