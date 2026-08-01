@@ -42,7 +42,7 @@ The database is **multi-tenant**: every tenant-scoped table has a `tenant_id` co
 | `academic_levels` | 14 grade levels (prescolaire → lycée) | cycle (prescolaire/primaire/cem/lycee), year_number, grade_code |
 | `classes` | Concrete class sections | academic_level_id, section, code, capacity, homeroom_teacher_id |
 | `subjects` | Catalog of teachable subjects | code, name_fr, domain (scolarite/club/therapy/auxiliary), default_coefficient |
-| `class_subjects` | M:N class↔subject with per-class coefficient | class_id, subject_id, teacher_id, coefficient |
+| `class_subjects` | M:N classsubject with per-class coefficient | class_id, subject_id, teacher_id, coefficient |
 | `assessments` | Devoir 1, Devoir 2, Examen per term | class_subject_id, term, kind, max_score, weight |
 | `grades` | Student scores (0–20) | student_id, assessment_id, score, subject_average (computed) |
 | `attendance_records` | 4-status roll call | student_id, class_id, date, status (present/absent_excused/absent_unexcused/late) |

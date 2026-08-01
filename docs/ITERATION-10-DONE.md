@@ -85,10 +85,10 @@ count of **836 passing tests with zero typecheck errors**.
 
 - **Gap:** The See Details modal's Demographics tab only had grade + gender
   pie charts. Plan §15.03 explicitly requires 4 chart types:
-  - Grade Level Distribution ✅ (already existed)
-  - Gender Distribution ✅ (already existed)
-  - **Age Distribution (histogram)** ❌ (was missing)
-  - **Capacity vs Enrollment (gauge)** ❌ (was missing)
+  - Grade Level Distribution  (already existed)
+  - Gender Distribution  (already existed)
+  - **Age Distribution (histogram)**  (was missing)
+  - **Capacity vs Enrollment (gauge)**  (was missing)
 - **Fix:**
   1. Extended `DashboardRepository.demographics()` to return 4 slices
      (`grade`, `gender`, `age`, `capacity`) instead of just 2.
@@ -110,8 +110,8 @@ count of **836 passing tests with zero typecheck errors**.
 
 - **Gap:** The Financials → Debt tab showed a flat list of debtors without
   ranking. Plan §07.06 explicitly requires:
-  - **Top 20 Family Debtors** ranking ❌ (was missing)
-  - **Per-Grade Breakdown** ❌ (was missing)
+  - **Top 20 Family Debtors** ranking  (was missing)
+  - **Per-Grade Breakdown**  (was missing)
 - **Fix:** Replaced the flat list with two cards:
   1. **"Top 20 débiteurs familiaux"** — debtors sorted by outstanding
      amount desc, capped at 20, with a numbered rank badge, aging-tier
@@ -244,23 +244,23 @@ All four verification commands pass with zero errors as of this iteration.
 
 | Plan section | Status | Notes |
 |---|---|---|
-| §02.03 Desktop Terminal | ✅ | Electron + React + shadcn/ui |
-| §02.06 Platform Feature Allocation Matrix | ✅ | All desktop-required features implemented |
-| §02.07 RBAC | ✅ | 11 roles, 47 permissions, FeatureRegistry |
-| §03.03 Desktop UI Architecture | ✅ | Sidebar + Topbar + Tabs + Modals |
-| §03.05 Four Consolidated UI Hubs | ✅ | Dashboard / Financial / CRM / Academic + Personnel + Workflow + Settings |
-| §04 Parent-Student CRM | ✅ | Parent-first, batch registration, drawers |
-| §05 Academic Structure | ✅ | 3 cycles, subjects, coefficients |
-| §06 Grading & Progression | ✅ | D1/D2/Examen formula, GPA, batch promotion |
-| §07 Financial Engine | ✅ + §07.06 Top 20 Debtors + Per-Grade (iteration 10) |
-| §08 Expense Workflow | ✅ | Two-tier approval + proof settlement + anomaly |
-| §09 Attendance & HR | ✅ + §09.05 Releve in PersonnelDetailDrawer (iteration 10) |
-| §10 Workflow Automation | ✅ | DAG canvas + Kahn's + manual triggers (mock deploy) |
-| §11 AI Integration | ✅ | Groq + OpenRouter + BYOK + 3 use cases (narrative, anomaly, drafting-as-removed-per-iter-9-spec) |
-| §12 Security & Audit | ✅ + §12.03 Personal Audit Feed (iteration 10) + §12.04 Password Governance (iteration 10) |
-| §13 Backup & Recovery | ✅ | AES-256 + IndexedDB vault + 365-day retention + restore |
-| §14 Data Bridge & Excel | ✅ | Import pipeline + export engine (ExcelJS) |
-| §15 Dashboard & Analytics | ✅ + §15.03 Age + Capacity charts (iteration 10) |
-| §16 Deprecations | ✅ | Fee Templates, Scholarships, Excel engine all purged |
+| §02.03 Desktop Terminal |  | Electron + React + shadcn/ui |
+| §02.06 Platform Feature Allocation Matrix |  | All desktop-required features implemented |
+| §02.07 RBAC |  | 11 roles, 47 permissions, FeatureRegistry |
+| §03.03 Desktop UI Architecture |  | Sidebar + Topbar + Tabs + Modals |
+| §03.05 Four Consolidated UI Hubs |  | Dashboard / Financial / CRM / Academic + Personnel + Workflow + Settings |
+| §04 Parent-Student CRM |  | Parent-first, batch registration, drawers |
+| §05 Academic Structure |  | 3 cycles, subjects, coefficients |
+| §06 Grading & Progression |  | D1/D2/Examen formula, GPA, batch promotion |
+| §07 Financial Engine |  + §07.06 Top 20 Debtors + Per-Grade (iteration 10) |
+| §08 Expense Workflow |  | Two-tier approval + proof settlement + anomaly |
+| §09 Attendance & HR |  + §09.05 Releve in PersonnelDetailDrawer (iteration 10) |
+| §10 Workflow Automation |  | DAG canvas + Kahn's + manual triggers (mock deploy) |
+| §11 AI Integration |  | Groq + OpenRouter + BYOK + 3 use cases (narrative, anomaly, drafting-as-removed-per-iter-9-spec) |
+| §12 Security & Audit |  + §12.03 Personal Audit Feed (iteration 10) + §12.04 Password Governance (iteration 10) |
+| §13 Backup & Recovery |  | AES-256 + IndexedDB vault + 365-day retention + restore |
+| §14 Data Bridge & Excel |  | Import pipeline + export engine (ExcelJS) |
+| §15 Dashboard & Analytics |  + §15.03 Age + Capacity charts (iteration 10) |
+| §16 Deprecations |  | Fee Templates, Scholarships, Excel engine all purged |
 
 The desktop application now fully matches the project plan and documentation.

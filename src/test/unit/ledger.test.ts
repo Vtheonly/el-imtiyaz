@@ -7,7 +7,7 @@
  *   - Parent summary aggregation
  *   - Reversal semantics (immutable, negates original)
  *   - Reconciliation (orphan reversals, double reversals, duplicate IDs, etc.)
- *   - Cross-checks (payments ↔ ledger, installments ↔ ledger)
+ *   - Cross-checks (payments  ledger, installments  ledger)
  *   - Property-based tests (random ledger states always reconcile)
  *   - Stress tests (10k entries)
  *   - Edge cases (empty ledger, single entry, negative balance / overpayment)

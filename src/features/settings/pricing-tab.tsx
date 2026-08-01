@@ -321,7 +321,7 @@ export function PricingTab() {
                 <div className="text-xs text-muted mt-2">
                   Somme des tranches : {formatDzd(draft.t1 + draft.t2 + draft.t3)}
                   {Math.abs(draft.t1 + draft.t2 + draft.t3 - draft.annual) > 1 && (
-                    <span className="text-status-danger ml-2">⚠︎ La somme ne correspond pas au montant annuel</span>
+                    <span className="text-status-danger ml-2"> La somme ne correspond pas au montant annuel</span>
                   )}
                 </div>
               </div>
@@ -404,7 +404,7 @@ export function PricingTab() {
                 <div className="text-xs text-muted mt-2">
                   Somme des tranches : {formatDzd(draft.t1 + draft.t2 + draft.t3)}
                   {Math.abs(draft.t1 + draft.t2 + draft.t3 - draft.annual) > 1 && (
-                    <span className="text-status-danger ml-2">⚠︎ La somme ne correspond pas au montant annuel</span>
+                    <span className="text-status-danger ml-2"> La somme ne correspond pas au montant annuel</span>
                   )}
                 </div>
               </div>

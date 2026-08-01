@@ -134,7 +134,7 @@ export function HomeworkHistoryTab() {
                       )}
                       {hw.acknowledgedCount > 0 && (
                         <span className="text-status-success font-medium">
-                          ✓ {hw.acknowledgedCount} accusé(s)
+                           {hw.acknowledgedCount} accusé(s)
                         </span>
                       )}
                     </div>

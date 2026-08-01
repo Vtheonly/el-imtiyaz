@@ -103,7 +103,7 @@ export function ClassDetailPage() {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Né(e) le {s.birthDate}
-                        {s.medicalNotes && ` · ⚠ ${s.medicalNotes}`}
+                        {s.medicalNotes && ` ·  ${s.medicalNotes}`}
                       </p>
                     </div>
                     <NarrativeGeneratorButton student={s} classId={classId!} />

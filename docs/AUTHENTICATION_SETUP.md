@@ -272,17 +272,17 @@ Currently no hard limit on concurrent sessions. For production with strict secur
 
 | Role | Code | Staff? | Web? | Description |
 |------|------|--------|------|-------------|
-| Super Admin | `super_admin` | ✓ | — | Full system control |
-| Financial Officer | `financial_officer` | ✓ | — | Financial hub + expense approvals |
-| Teacher | `teacher` | ✓ | — | Grades + attendance + homework |
-| Support Staff | `support_staff` | ✓ | — | Operations + parent registration |
-| Manager | `manager` | ✓ | — | Department management + task assignment |
-| Buyer | `buyer` | ✓ | — | Procurement + suppliers |
-| Driver | `driver` | ✓ | — | Deliveries + routing |
-| Warehouse Worker | `warehouse_worker` | ✓ | — | Inventory + receipts/dispatches |
-| Worker | `worker` | ✓ | — | General tasks |
-| Parent | `parent` | — | ✓ | Web portal — view own children |
-| Student | `student` | — | ✓ | Web portal — view own grades |
+| Super Admin | `super_admin` |  | — | Full system control |
+| Financial Officer | `financial_officer` |  | — | Financial hub + expense approvals |
+| Teacher | `teacher` |  | — | Grades + attendance + homework |
+| Support Staff | `support_staff` |  | — | Operations + parent registration |
+| Manager | `manager` |  | — | Department management + task assignment |
+| Buyer | `buyer` |  | — | Procurement + suppliers |
+| Driver | `driver` |  | — | Deliveries + routing |
+| Warehouse Worker | `warehouse_worker` |  | — | Inventory + receipts/dispatches |
+| Worker | `worker` |  | — | General tasks |
+| Parent | `parent` | — |  | Web portal — view own children |
+| Student | `student` | — |  | Web portal — view own grades |
 
 ### 56 permissions
 

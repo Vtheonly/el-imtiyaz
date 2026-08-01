@@ -359,7 +359,7 @@ If a deployment goes wrong:
    supabase migration list  # see applied migrations
    supabase migration revert --to <migration_number>
    ```
-   ⚠️ This will DELETE data. Test in staging first.
+    This will DELETE data. Test in staging first.
 
 2. **Edge Function rollback** — Supabase keeps previous versions. Dashboard →
    Functions → select function → Rolls back to previous version.

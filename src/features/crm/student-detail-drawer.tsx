@@ -202,7 +202,7 @@ function InfoTab({
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-sm">Famille</CardTitle>
-            <CardDescription>Navigation bidirectionnelle parent ↔ enfant (plan §04.04)</CardDescription>
+            <CardDescription>Navigation bidirectionnelle parent  enfant (plan §04.04)</CardDescription>
           </div>
           {parent && onOpenParent && (
             <Button size="sm" variant="outline" onClick={() => onOpenParent(parent.id)}>

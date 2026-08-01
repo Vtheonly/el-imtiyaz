@@ -2,7 +2,7 @@
 
 This package contains the complete El-Imtiyaz educational management platform with full Supabase backend integration. **Everything you need to configure and connect the backend is included.**
 
-## 📚 Documentation Index
+##  Documentation Index
 
 **Start here:**
 - **[QUICKSTART.md](docs/QUICKSTART.md)** — 15-minute getting started guide
@@ -26,7 +26,7 @@ This package contains the complete El-Imtiyaz educational management platform wi
 
 ---
 
-## 🚀 Quick Start (15 minutes)
+##  Quick Start (15 minutes)
 
 1. **Create Supabase project** → https://supabase.com/dashboard
 2. **Apply migrations** → `cd supabase && supabase db push`
@@ -40,7 +40,7 @@ See **[QUICKSTART.md](docs/QUICKSTART.md)** for step-by-step instructions.
 
 ---
 
-## 📦 What's in This Package
+##  What's in This Package
 
 ```
 el-imtiyaz-iteration-12/
@@ -145,7 +145,7 @@ el-imtiyaz-iteration-12/
 
 ---
 
-## ✅ Test Status
+##  Test Status
 
 - **Typecheck:** clean (0 errors)
 - **Tests:** 1015 passing (46 files)
@@ -153,7 +153,7 @@ el-imtiyaz-iteration-12/
 
 ---
 
-## 🔑 What You Need to Configure
+##  What You Need to Configure
 
 After following the setup guide, the ONLY things you need to provide are:
 
@@ -164,19 +164,19 @@ After following the setup guide, the ONLY things you need to provide are:
 
 ### Configurable from the desktop UI (Settings → Configuration)
 Everything else is configurable from the desktop app:
-- ✅ Supabase URL + anon key
-- ✅ AI provider keys (Groq, OpenRouter)
-- ✅ Email service (Resend)
-- ✅ Push notifications (FCM)
-- ✅ Backup passphrase
-- ✅ All system settings (CORS, rate limits, log level, timezone)
-- ✅ Feature flags (AI, workflows, backup daemon, realtime, Arabic RTL)
+-  Supabase URL + anon key
+-  AI provider keys (Groq, OpenRouter)
+-  Email service (Resend)
+-  Push notifications (FCM)
+-  Backup passphrase
+-  All system settings (CORS, rate limits, log level, timezone)
+-  Feature flags (AI, workflows, backup daemon, realtime, Arabic RTL)
 
 **No manual `.env` file editing required** — everything is accessible through the UI.
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -215,29 +215,29 @@ Desktop, Mobile, and Web all connect to the SAME Supabase project. No platform-s
 
 ---
 
-## 📖 Key Features
+##  Key Features
 
 ### Backend (Supabase)
-- ✅ 25 SQL migrations (~3,000 LOC) — complete schema with RLS, triggers, functions, views, indexes
-- ✅ 11 Edge Functions — approval workflow, payment collection, AI proxy, workflow executor, cron jobs
-- ✅ 10 storage buckets with RLS — signed URLs only (no public URLs)
-- ✅ 4 cron jobs — overdue scan, approval expiry, MV refresh, backup purge
-- ✅ Multi-tenant with RLS on every table
-- ✅ 11 roles + 56 permissions + role-permission matrix
-- ✅ Audit log (append-only) — every state change recorded
-- ✅ Ledger-based accounting — balances computed by replay, never stored
+-  25 SQL migrations (~3,000 LOC) — complete schema with RLS, triggers, functions, views, indexes
+-  11 Edge Functions — approval workflow, payment collection, AI proxy, workflow executor, cron jobs
+-  10 storage buckets with RLS — signed URLs only (no public URLs)
+-  4 cron jobs — overdue scan, approval expiry, MV refresh, backup purge
+-  Multi-tenant with RLS on every table
+-  11 roles + 56 permissions + role-permission matrix
+-  Audit log (append-only) — every state change recorded
+-  Ledger-based accounting — balances computed by replay, never stored
 
 ### Desktop App (Electron)
-- ✅ Settings → Configuration tab — ALL settings configurable from UI
-- ✅ Settings → Inscriptions tab — approval workflow (web registration → admin approval)
-- ✅ Unified Modal System — 100% of modals use UnifiedModal
-- ✅ Mock fallback — works without Supabase for development
-- ✅ 1015 tests passing
-- ✅ Particle intro animation + dark theme + FR/AR RTL support
+-  Settings → Configuration tab — ALL settings configurable from UI
+-  Settings → Inscriptions tab — approval workflow (web registration → admin approval)
+-  Unified Modal System — 100% of modals use UnifiedModal
+-  Mock fallback — works without Supabase for development
+-  1015 tests passing
+-  Particle intro animation + dark theme + FR/AR RTL support
 
 ---
 
-## 🆘 Need Help?
+##  Need Help?
 
 1. Check **[QUICKSTART.md](docs/QUICKSTART.md)** for the 15-minute setup
 2. Check **[BACKEND_SETUP_GUIDE.md](docs/BACKEND_SETUP_GUIDE.md)** for detailed instructions

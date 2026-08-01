@@ -303,9 +303,9 @@ All three verification commands pass with zero errors.
 
 | Plan section | Status | Notes |
 |---|---|---|
-| §02.03 Desktop Terminal | ✅ | Electron + React + shadcn/ui — unchanged |
-| §14 Data Bridge & Excel | ✅ + multi-schema engine + audit trail + reports (iteration 11) | 4 schemas (ETAT/BON/Devis/REF), idempotent upsert, JSON+Excel reports |
-| §03.04 Particle Intro | ✅ + image-pipeline particle engine (iteration 11) | Replaces legacy 60-particle ring with image-sampled EI monogram |
+| §02.03 Desktop Terminal |  | Electron + React + shadcn/ui — unchanged |
+| §14 Data Bridge & Excel |  + multi-schema engine + audit trail + reports (iteration 11) | 4 schemas (ETAT/BON/Devis/REF), idempotent upsert, JSON+Excel reports |
+| §03.04 Particle Intro |  + image-pipeline particle engine (iteration 11) | Replaces legacy 60-particle ring with image-sampled EI monogram |
 
 The desktop application now has both engines integrated as first-class
 modules — they feel like they were originally designed as part of the

@@ -166,9 +166,9 @@ Button, Card, Dialog, Tabs, Badge, Avatar, ScrollArea, Separator, Tooltip, Dropd
 ## Build verification
 
 ```
-✓ tsc --noEmit           (clean)
-✓ vite build             (995 kB bundle, 27 kB CSS)
-✓ electron tsc           (clean)
+ tsc --noEmit           (clean)
+ vite build             (995 kB bundle, 27 kB CSS)
+ electron tsc           (clean)
 ```
 
 App runs end-to-end with mock data:

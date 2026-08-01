@@ -162,11 +162,11 @@ Now:
 Verified: **zero raw `@radix-ui/react-dialog` imports in production code outside `unified-modal.tsx`**. The dead `dialog.tsx` file was deleted. The existing regression test (`modal-unification-regression.test.ts`) still passes.
 
 All Settings tabs that open modals correctly use `<UnifiedModal>` or `<ConfirmModal>`:
-- `settings-page.tsx` (audit diff drawer) ✓
-- `approvals-tab.tsx` (decision modal) ✓
-- `backup-tab.tsx` (restore/delete confirm) ✓
-- `sync-tab.tsx` (clear queue confirm) ✓
-- `configuration-tab.tsx` (secret edit modal) ✓
+- `settings-page.tsx` (audit diff drawer) 
+- `approvals-tab.tsx` (decision modal) 
+- `backup-tab.tsx` (restore/delete confirm) 
+- `sync-tab.tsx` (clear queue confirm) 
+- `configuration-tab.tsx` (secret edit modal) 
 
 ### 9. Tests — 42 New Tests, 0 Regressions
 

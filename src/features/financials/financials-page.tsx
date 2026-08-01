@@ -255,7 +255,7 @@ function DebtTab() {
           <ul className="divide-y divide-border">
             {top20Debtors.length === 0 ? (
               <li className="p-6 text-center text-sm text-muted-foreground">
-                Aucune créance en cours. 🎉
+                Aucune créance en cours. 
               </li>
             ) : (
               top20Debtors.map((d, idx) => (

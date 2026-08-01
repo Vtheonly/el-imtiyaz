@@ -219,9 +219,9 @@ A comprehensive audit of all 21 modal-style call sites found:
 
 | Classification | Count | % |
 |---|---:|---:|
-| ✅ UNIFIED (`UnifiedModal` or `ConfirmDialog`) | **20** | 95.2% |
-| ⚠️ EXCEPTION (documented bypass) | **1** | 4.8% |
-| ❌ VIOLATION (undocumented bypass) | **0** | 0.0% |
+|  UNIFIED (`UnifiedModal` or `ConfirmDialog`) | **20** | 95.2% |
+|  EXCEPTION (documented bypass) | **1** | 4.8% |
+|  VIOLATION (undocumented bypass) | **0** | 0.0% |
 
 The one exception is the Cmd+K command palette in `topbar.tsx` — it bypasses `UnifiedModal` because command palettes follow a fundamentally different UX pattern (no title/icon/description/footer, search input embedded in header, `p-0` layout). The bypass is documented inline with a justified comment.
 
@@ -235,9 +235,9 @@ A comprehensive audit of all 9 tab-style call sites found:
 
 | Classification | Count |
 |---|---:|
-| ✅ UNIFIED | **8** |
-| ⚠️ INCONSISTENT | **1** |
-| ❌ VIOLATION (raw `<Tabs>` bypass) | **0** |
+|  UNIFIED | **8** |
+|  INCONSISTENT | **1** |
+|  VIOLATION (raw `<Tabs>` bypass) | **0** |
 
 **100% icon coverage** across 41 tab triggers. Zero raw-Radix bypasses.
 
@@ -407,21 +407,21 @@ The following items from the iteration-3+ roadmap remain (all P3, locked):
 
 | Plan requirement | Status | Evidence |
 |---|---|---|
-| All pricing configurable by administrators | ✅ | PricingRepository + Settings → Pricing tab with full CRUD |
-| Never hardcode payment values | ✅ | Only `pricing-seed.ts` contains hardcoded amounts; everything else reads from config |
-| Adding a price must never require source code changes | ✅ | Admin can add/remove discounts, services, complementary services at runtime |
-| Per-grade-level tuition (14 grades) | ✅ | `tuitionByGradeLevel: Record<GradeLevel, TuitionPricing>` |
-| Per-destination transport (4 zones) | ✅ | `transportByDestination: Record<TransportDestination, TransportPricing>` |
-| 3-tranche schedule with specific due dates | ✅ | Each grade + destination has its own non-equal 3-tranche split |
-| 5 canonical discounts | ✅ | passage_palier, seniority_5y, full_annual, highest_average, sibling_fixed |
-| Complementary services (psychology, speech therapy) | ✅ | semesterAmount + annualAmount per service |
-| 2nd apron surcharge | ✅ | `secondApronFee: 2,000` |
-| Ledger is single source of truth | ✅ | Every balance computed by replay via `computeParentSummary()` |
-| Every charge traceable | ✅ | LedgerEntry includes actorId, actorName, at, sourceType, sourceId, description, metadata |
-| Refunds create reversal entries (not deletions) | ✅ | `MockPaymentRepository.refund` appends `type="reversal"` entry with `reversesId` link |
-| No self-approval | ✅ | Enforced at repository layer with `ERR_FORBIDDEN` |
-| Atomic batch registration | ✅ | `MockStudentRepository.batchRegister` snapshots + rolls back on failure |
-| Particle animation restored | ✅ | 3-mode engine + layered splash screen + layered login brand panel |
-| Unified modal system | ✅ | 20/21 unified, 1 documented exception, 0 violations |
-| Unified tab navigation | ✅ | 9/9 unified (after Settings rail fix), 100% icon coverage |
-| Comprehensive testing | ✅ | 330 tests passing (273 baseline + 57 new) |
+| All pricing configurable by administrators |  | PricingRepository + Settings → Pricing tab with full CRUD |
+| Never hardcode payment values |  | Only `pricing-seed.ts` contains hardcoded amounts; everything else reads from config |
+| Adding a price must never require source code changes |  | Admin can add/remove discounts, services, complementary services at runtime |
+| Per-grade-level tuition (14 grades) |  | `tuitionByGradeLevel: Record<GradeLevel, TuitionPricing>` |
+| Per-destination transport (4 zones) |  | `transportByDestination: Record<TransportDestination, TransportPricing>` |
+| 3-tranche schedule with specific due dates |  | Each grade + destination has its own non-equal 3-tranche split |
+| 5 canonical discounts |  | passage_palier, seniority_5y, full_annual, highest_average, sibling_fixed |
+| Complementary services (psychology, speech therapy) |  | semesterAmount + annualAmount per service |
+| 2nd apron surcharge |  | `secondApronFee: 2,000` |
+| Ledger is single source of truth |  | Every balance computed by replay via `computeParentSummary()` |
+| Every charge traceable |  | LedgerEntry includes actorId, actorName, at, sourceType, sourceId, description, metadata |
+| Refunds create reversal entries (not deletions) |  | `MockPaymentRepository.refund` appends `type="reversal"` entry with `reversesId` link |
+| No self-approval |  | Enforced at repository layer with `ERR_FORBIDDEN` |
+| Atomic batch registration |  | `MockStudentRepository.batchRegister` snapshots + rolls back on failure |
+| Particle animation restored |  | 3-mode engine + layered splash screen + layered login brand panel |
+| Unified modal system |  | 20/21 unified, 1 documented exception, 0 violations |
+| Unified tab navigation |  | 9/9 unified (after Settings rail fix), 100% icon coverage |
+| Comprehensive testing |  | 330 tests passing (273 baseline + 57 new) |
