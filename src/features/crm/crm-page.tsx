@@ -9,20 +9,20 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Filter, Search, Download, Phone, MessageCircle, Mail, Eye, Users, GraduationCap, UserPlus } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import type { Parent } from "../../domain/model/parent";
 import type { Student } from "../../domain/model/student";
 import { LEVEL_LABELS_FR, STUDENT_STATUS_LABELS_FR } from "../../domain/model/student";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { PageHeader } from "../../shared/components/page-header";
+import { PageHeader } from "../../shared/layout/page-header";
 import { Card, CardContent } from "../../shared/ui/card";
-import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/components/page-tabs";
+import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/layout/page-tabs";
 import { Button } from "../../shared/ui/button";
 import { Input } from "../../shared/ui/input";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
-import { StatusChip } from "../../shared/components/status-chip";
-import { AsyncContent, EmptyState } from "../../shared/components/state-views";
-import { ComingSoonCard } from "../../shared/components/coming-soon-card";
+import { StatusChip } from "../../shared/ui/status-chip";
+import { AsyncContent, EmptyState } from "../../shared/layout/state-views";
+import { ComingSoonCard } from "../../shared/layout/coming-soon-card";
 import { BatchRegistrationModal } from "./batch-registration-modal";
 import { ParentDetailDrawer } from "./parent-detail-drawer";
 import { StudentDetailDrawer } from "./student-detail-drawer";
@@ -31,6 +31,9 @@ import { FileSpreadsheet, Upload } from "lucide-react";
 
 export function CrmPage() {
   const { t } = useTranslation();
+  const repos = useRepositories();
+  const parents = useObservable(() => repos.parents.observe(), []);
+  const students = useObservable(() => repos.students.observe(), []);
   const [batchOpen, setBatchOpen] = useState(false);
   const [drawerParentId, setDrawerParentId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -67,8 +70,8 @@ export function CrmPage() {
       />
       <PageTabs defaultValue="parents" className="flex-1 flex flex-col px-6 pb-6 min-h-0">
         <PageTabList>
-          <PageTab value="parents" label="Parents" icon={Users} />
-          <PageTab value="students" label="Élèves" icon={GraduationCap} />
+          <PageTab value="parents" label="Parents" icon={Users} count={parents.length} />
+          <PageTab value="students" label="Élèves" icon={GraduationCap} count={students.length} />
           <PageTab value="batch" label="Inscription groupée" icon={UserPlus} />
         </PageTabList>
         <PageTabContent value="parents">

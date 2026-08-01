@@ -1,325 +1,246 @@
-# El-Imtiyaz Desktop Terminal
+# El-Imtiyaz Platform — Complete Backend Configuration Package
 
-Production-grade Electron desktop application for the **El-Imtiyaz Educational & Operational Management Platform** — a private school management system serving the Algerian education market (DZD currency, French + Arabic languages).
+This package contains the complete El-Imtiyaz educational management platform with full Supabase backend integration. **Everything you need to configure and connect the backend is included.**
 
-Rebuilt **from scratch** following `entire_project_plan.txt`. The legacy desktop codebase is NOT used as a foundation; only the particle intro animation is preserved as a brand-identity asset.
+## 📚 Documentation Index
+
+**Start here:**
+- **[QUICKSTART.md](docs/QUICKSTART.md)** — 15-minute getting started guide
+- **[BACKEND_SETUP_GUIDE.md](docs/BACKEND_SETUP_GUIDE.md)** — Complete 15-step setup guide (30-45 min)
+
+**Reference documentation:**
+- **[ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)** — Every env var explained + where to set it
+- **[DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)** — All 50+ tables, RLS, triggers, functions, views, indexes
+- **[EDGE_FUNCTIONS.md](docs/EDGE_FUNCTIONS.md)** — All 11 Edge Functions documented
+- **[AUTHENTICATION_SETUP.md](docs/AUTHENTICATION_SETUP.md)** — JWT, Google OAuth, approval workflow, RBAC
+- **[STORAGE_SETUP.md](docs/STORAGE_SETUP.md)** — All 10 buckets + RLS policies + signed URLs
+- **[BACKUP_AND_SYNC.md](docs/BACKUP_AND_SYNC.md)** — Backup strategy + sync logic
+
+**Iteration history:**
+- **[ITERATION-12-DONE.md](docs/ITERATION-12-DONE.md)** — Supabase integration completion report
+- **[ITERATION-13-DONE.md](docs/ITERATION-13-DONE.md)** — UI-driven configuration completion report
+
+**Source documents:**
+- **[Entire_Project_Plan.txt](docs/Entire_Project_Plan.txt)** — The source of truth (224KB)
+- **[Clients_Sheet_Merged.txt](docs/Clients_Sheet_Merged.txt)** — Excel business logic reference (355KB)
 
 ---
 
-## Quick Start
+## 🚀 Quick Start (15 minutes)
 
-```bash
-# Install dependencies
-npm install
+1. **Create Supabase project** → https://supabase.com/dashboard
+2. **Apply migrations** → `cd supabase && supabase db push`
+3. **Deploy Edge Functions** → `supabase functions deploy <name>` (11 functions)
+4. **Set secrets** → `supabase secrets set KEY=value` (see ENVIRONMENT_VARIABLES.md)
+5. **Create SuperAdmin** → via Supabase Dashboard + SQL (see QUICKSTART.md Step 7)
+6. **Launch desktop app** → `cd app && npm install && npm start`
+7. **Configure from UI** → Settings → Configuration tab
 
-# Start the Vite dev server (renderer only, useful for UI iteration)
-npm run dev
+See **[QUICKSTART.md](docs/QUICKSTART.md)** for step-by-step instructions.
 
-# Start the full Electron app in dev mode (Vite + Electron)
-npm run electron:dev
+---
 
-# Type-check the entire codebase (renderer + Electron main)
-npm run typecheck
+## 📦 What's in This Package
 
-# Build the renderer for production
-npm run build
-
-# Build distributable Electron packages
-npm run electron:build
+```
+el-imtiyaz-iteration-12/
+├── README.md                          # This file
+│
+├── docs/                              # Complete documentation
+│   ├── QUICKSTART.md                  # 15-minute quick start
+│   ├── BACKEND_SETUP_GUIDE.md         # Complete setup guide (15 steps)
+│   ├── ENVIRONMENT_VARIABLES.md       # Every env var explained
+│   ├── DATABASE_SCHEMA.md             # All tables + RLS + triggers + functions
+│   ├── EDGE_FUNCTIONS.md              # All 11 Edge Functions
+│   ├── AUTHENTICATION_SETUP.md        # JWT + OAuth + approval workflow
+│   ├── STORAGE_SETUP.md               # All 10 buckets + RLS
+│   ├── BACKUP_AND_SYNC.md             # Backup strategy
+│   ├── DEPLOYMENT.md                  # Deployment guide
+│   ├── ITERATION-12-DONE.md           # Iteration 12 report
+│   ├── ITERATION-13-DONE.md           # Iteration 13 report
+│   ├── Entire_Project_Plan.txt        # Source of truth
+│   └── Clients_Sheet_Merged.txt       # Excel business logic
+│
+├── app/                               # Electron desktop application
+│   ├── src/                           # React + TypeScript source
+│   │   ├── core/                      # Pure utilities (result, errors, rbac, format)
+│   │   ├── domain/                    # Domain models + repository contracts
+│   │   ├── infrastructure/
+│   │   │   ├── supabase/              # Supabase client adapter
+│   │   │   ├── config/                # SystemConfig service (UI-driven config)
+│   │   │   ├── mock/                  # Mock repositories (default)
+│   │   │   ├── backup/                # AES-256 backup system
+│   │   │   ├── ai/                    # AI adapter + config storage
+│   │   │   ├── pdf/                   # PDF generation
+│   │   │   ├── excel/                 # Excel import/export engine
+│   │   │   └── repository-provider.tsx # Auto-selects mock vs Supabase
+│   │   ├── features/                  # Feature modules
+│   │   │   ├── auth/                  # Login + splash screen
+│   │   │   ├── dashboard/             # Dashboard + KPIs + calendar
+│   │   │   ├── crm/                   # Parents + students + batch registration
+│   │   │   ├── academics/             # Classes + grades + attendance + homework
+│   │   │   ├── financials/            # Payments + installments + expenses
+│   │   │   ├── personnel/             # HR + workforce management
+│   │   │   ├── workflow/              # DAG workflow editor
+│   │   │   ├── settings/              # Configuration + approvals + RBAC + backup
+│   │   │   └── profile/               # User profile
+│   │   ├── shared/                    # Shared UI (UnifiedModal, PageTabs, etc.)
+│   │   ├── state/                     # React contexts (auth, toast, modal)
+│   │   └── test/                      # 1015 tests (46 files)
+│   ├── electron/                      # Electron main process + preload + IPC
+│   ├── docs/                          # Iteration docs (1-13)
+│   ├── package.json
+│   ├── .env.example                   # Desktop env template
+│   ├── tsconfig.json
+│   ├── vite.config.ts
+│   ├── vitest.config.ts
+│   ├── tailwind.config.cjs
+│   └── worklog.md
+│
+└── supabase/                          # Supabase backend
+    ├── migrations/                    # 25 SQL migration files (~3,000 LOC)
+    │   ├── 0001_extensions.sql        # PostgreSQL extensions
+    │   ├── 0002_tenants_and_users.sql # Multi-tenant + users + approval workflow
+    │   ├── 0003_rbac.sql              # Roles + permissions + role assignments
+    │   ├── 0004_academic_structure.sql # Academic years + levels + classes + subjects
+    │   ├── 0005_crm.sql               # Parents + students + activation codes
+    │   ├── 0006_pricing.sql           # Pricing config + tuitions + transport + discounts
+    │   ├── 0007_financial.sql         # Payments + installments + ledger + receipts
+    │   ├── 0008_expenses.sql          # Expense workflow
+    │   ├── 0009_attendance_hr.sql     # Personnel + releve
+    │   ├── 0010_workforce.sql         # Departments + shifts + tasks + chat
+    │   ├── 0011_operations.sql        # Suppliers + deliveries + inventory
+    │   ├── 0012_workflow.sql          # Workflows + AI configs
+    │   ├── 0013_calendar_notifications_backup.sql # Calendar + notifications + backup
+    │   ├── 0014_audit.sql             # Audit log (append-only)
+    │   ├── 0018_storage.sql           # 10 storage buckets + RLS
+    │   ├── 0019_rls_policies.sql      # RLS for EVERY table
+    │   ├── 0020_indexes.sql           # 50+ performance indexes
+    │   ├── 0021_views.sql             # 5 materialized + 10 regular views
+    │   ├── 0022_functions.sql         # 14 PostgreSQL functions
+    │   ├── 0023_seed.sql              # Seed data (tenant + roles + permissions + pricing)
+    │   └── 0024_system_settings.sql   # System settings table + 39 defaults
+    │
+    ├── functions/                     # 11 Edge Functions
+    │   ├── _shared/                   # Shared utilities (CORS, Supabase client, audit)
+    │   ├── approve-signup-request/     # Web registration → admin approval
+    │   ├── bind-activation-code/       # Parent web portal activation
+    │   ├── update-server-secret/       # Update Edge Function env vars from UI
+    │   ├── collect-payment/            # Atomic payment collection
+    │   ├── refund-payment/             # Atomic payment refund
+    │   ├── ai-proxy/                   # AI provider proxy (Groq/OpenRouter)
+    │   ├── workflow-execute/           # DAG workflow executor
+    │   ├── run-overdue-scan/           # Cron: daily overdue scan
+    │   ├── expire-pending-approvals/   # Cron: daily approval expiry
+    │   ├── refresh-materialized-views/ # Cron: daily MV refresh
+    │   └── purge-expired-backups/      # Cron: weekly backup purge
+    │
+    ├── docs/                          # Supabase-specific docs
+    │   ├── DEPLOYMENT.md
+    │   └── BACKUP_AND_SYNC.md
+    │
+    ├── config.toml                    # Supabase project configuration
+    └── .env.example                   # Backend env template (placeholders only)
 ```
 
-### Demo accounts (mock auth)
+---
 
-| Role                 | Email                     | Password     |
-|----------------------|---------------------------|--------------|
-| Super Administrateur | `admin@elimtiyaz.dz`      | `admin123`   |
-| Agent Financier      | `financial@elimtiyaz.dz`  | `fin123`     |
-| Enseignant           | `teacher@elimtiyaz.dz`    | `teach123`   |
-| Personnel de Soutien | `support@elimtiyaz.dz`    | `support123` |
+## ✅ Test Status
+
+- **Typecheck:** clean (0 errors)
+- **Tests:** 1015 passing (46 files)
+- **Build:** succeeds in ~16s
 
 ---
 
-## Architecture
+## 🔑 What You Need to Configure
 
-### Layered structure
+After following the setup guide, the ONLY things you need to provide are:
+
+### One-time setup (via CLI)
+1. **Supabase project** — create at supabase.com
+2. **SUPABASE_ACCESS_TOKEN** — personal access token for Management API
+3. **SUPABASE_PROJECT_REF** — your project's reference ID
+
+### Configurable from the desktop UI (Settings → Configuration)
+Everything else is configurable from the desktop app:
+- ✅ Supabase URL + anon key
+- ✅ AI provider keys (Groq, OpenRouter)
+- ✅ Email service (Resend)
+- ✅ Push notifications (FCM)
+- ✅ Backup passphrase
+- ✅ All system settings (CORS, rate limits, log level, timezone)
+- ✅ Feature flags (AI, workflows, backup daemon, realtime, Arabic RTL)
+
+**No manual `.env` file editing required** — everything is accessible through the UI.
+
+---
+
+## 🏗️ Architecture
 
 ```
-src/
-├── app/                     # App shell, providers, top-level routing
-│   ├── app.tsx              # Root: providers + auth-gated routes
-│   ├── app-shell.tsx        # Sidebar + Topbar + content area
-│   └── splash-gate.tsx      # Particle intro animation gate
-│
-├── core/                    # Pure, framework-agnostic primitives
-│   ├── result/              # Result<T, E> discriminated union
-│   ├── errors/              # AppError + typed error builders
-│   ├── logging/             # Structured 6-level logger (PII masking)
-│   ├── audit/               # AuditAction constants (wire-protocol)
-│   ├── format/              # Currency (DZD), date, ID formatters
-│   └── rbac/                # Roles, Permissions, FeatureGate, FeatureRegistry
-│
-├── domain/                  # Pure business model (no I/O, no React)
-│   ├── model/               # Parent, Student, Academic, Payment, Expense,
-│   │                        #   Personnel, Operations, Audit entities
-│   └── repository/          # Repository contracts (interfaces only)
-│
-├── infrastructure/          # Adapters that implement domain contracts
-│   ├── mock/                # In-memory reactive mock with seed data
-│   │   ├── seed-data.ts     # 8 parents, 15 students, 30 payments, etc.
-│   │   ├── subject-behavior.ts  # Minimal Observable<T> primitive
-│   │   └── mock-repositories.ts # All 17 mock repository implementations
-│   └── repository-provider.tsx  # DI seam — swap mock → Supabase here
-│
-├── state/                   # React contexts (cross-cutting state)
-│   ├── auth-context.tsx     # Session + sign-in / sign-out
-│   ├── toast-context.tsx    # Popups / dialogs (secondary feedback layer)
-│   └── modal-context.tsx    # Modal manager (primary interaction layer)
-│
-├── shared/                  # Reusable presentation layer
-│   ├── ui/                  # shadcn-style primitives (button, card, dialog…)
-│   ├── components/          # App-specific (StatusChip, KpiCard, Sidebar…)
-│   ├── hooks/               # useObservable, future usePaginate, etc.
-│   └── ...
-│
-├── features/                # Feature modules (one folder per hub)
-│   ├── auth/                # Login screen + splash screen
-│   ├── dashboard/           # Hub 1 — KPIs, charts, See Details modal
-│   ├── crm/                 # Hub 2 — Parents & students directory
-│   ├── academics/           # Hub 3 — Classes, subjects, homework
-│   ├── financials/          # Hub 4 — Payments, debt, expenses
-│   ├── personnel/           # Hub 5 — Directory, Relevé, audit, workflows
-│   ├── routing/             # Driver mode (stubbed; not in plan)
-│   └── settings/            # Settings + Audit log viewer (showcase)
-│
-├── i18n/                    # i18next setup (FR primary, AR secondary)
-│   ├── i18n.ts
-│   ├── fr.ts
-│   └── ar.ts
-│
-├── main.tsx                 # React entrypoint
-└── index.css                # Tailwind + design tokens (CSS variables)
-
-electron/                    # Electron main process
-├── main.ts                  # BrowserWindow + menu + lifecycle
-├── preload.ts               # contextBridge API exposed to renderer
-└── ipc-handlers.ts          # File system, shell, app info handlers
+┌─────────────────────────────────────────────────────────────┐
+│                    Supabase Project                         │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │ PostgreSQL  │  │   Auth (JWT) │  │  Edge Functions  │   │
+│  │  + RLS      │  │  + OAuth     │  │  (11 functions)  │   │
+│  │  50+ tables │  │              │  │                  │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │  Storage    │  │  Realtime    │  │  Cron Jobs       │   │
+│  │ (10 buckets)│  │ (postgres_   │  │  (4 scheduled    │   │
+│  │             │  │   changes)   │  │   functions)     │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+              ▼               ▼               ▼
+     ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+     │  Desktop    │  │   Mobile    │  │    Web      │
+     │  (Electron) │  │ (Android)   │  │  (Parents)  │
+     │             │  │             │  │             │
+     │ Full admin  │  │ Staff-only  │  │ Read-only   │
+     │ + config UI │  │ + camera    │  │ own data    │
+     └─────────────┘  └─────────────┘  └─────────────┘
 ```
 
-### Architectural principles applied
+### Multi-tenant
 
-- **Clean Architecture layers**: `core` (pure) ← `domain` (pure) ← `infrastructure` (adapters) ← `features` (UI). Each layer can only depend on layers to its left.
-- **Repository pattern**: 17 repository contracts in `domain/repository/`. The mock implementation is wired in `infrastructure/repository-provider.tsx`. Swapping to Supabase means writing a new file that implements the same interfaces and passing it to `<RepositoryProvider repositories={...}>`.
-- **Result<T, E>**: All fallible operations return `Result` rather than throwing. The type system forces callers to handle both success and failure paths.
-- **Composition over inheritance**: No deep inheritance trees. Every UI piece is a small composable component.
-- **Feature-flagged RBAC**: Single source of truth in `core/rbac/feature-registry.ts`. UI components consume nodes via `<GatedContent node={...}>` so permission rules live in one file.
-- **Strong typing**: Every entity, every repository method, every UI prop is typed. No `any` outside the Electron IPC bridge (where it's unavoidable).
-- **Audit trail**: Every mutating mock repository method writes to the in-memory audit log via `appendAudit()`. The pattern carries over to the Supabase adapter unchanged.
+Every table has `tenant_id`. RLS policies filter by the caller's tenant. The schema supports ~5,000 total users / 300 daily active / 50 peak concurrent.
 
-### Tech stack
+### Shared backend
 
-| Concern                | Choice                              | Why                                            |
-|------------------------|-------------------------------------|------------------------------------------------|
-| Desktop shell          | Electron 33                         | Plan mandate                                   |
-| Build tool             | Vite 6                              | Fast HMR, modern ESM                           |
-| UI framework           | React 18 + TypeScript 5.7           | Plan mandate (React), strict typing            |
-| Styling                | Tailwind 3.4 + CSS variables        | Plan mandate (shadcn/ui uses Tailwind)         |
-| Component primitives   | Radix UI + custom shadcn-style      | Accessible, unstyled, composable               |
-| Charts                 | Recharts 2                          | Reactive, declarative, React-friendly          |
-| Routing                | React Router 7 (HashRouter)         | Electron-safe (no server)                      |
-| State (cross-cutting)  | React Context                       | Minimal footprint, no extra deps               |
-| Server state           | TanStack Query 5                    | Caching, refetch, retries                      |
-| i18n                   | i18next + react-i18next             | FR/AR/EN ready, RTL support                    |
-| Forms                  | React Hook Form + Zod               | Schema validation, performant                  |
-| Icons                  | lucide-react                        | Tree-shakeable, consistent style               |
+Desktop, Mobile, and Web all connect to the SAME Supabase project. No platform-specific business logic duplication — all logic lives in PostgreSQL functions + Edge Functions.
 
 ---
 
-## Design System
+## 📖 Key Features
 
-All design tokens are CSS variables defined in `src/index.css`. Components reference them via Tailwind utility classes (`bg-brand-blue`, `text-status-success`, etc.) or via `var(--brand-blue)` directly.
+### Backend (Supabase)
+- ✅ 25 SQL migrations (~3,000 LOC) — complete schema with RLS, triggers, functions, views, indexes
+- ✅ 11 Edge Functions — approval workflow, payment collection, AI proxy, workflow executor, cron jobs
+- ✅ 10 storage buckets with RLS — signed URLs only (no public URLs)
+- ✅ 4 cron jobs — overdue scan, approval expiry, MV refresh, backup purge
+- ✅ Multi-tenant with RLS on every table
+- ✅ 11 roles + 56 permissions + role-permission matrix
+- ✅ Audit log (append-only) — every state change recorded
+- ✅ Ledger-based accounting — balances computed by replay, never stored
 
-### Color palette (plan §03.01)
-
-| Token              | Hex       | Use                                   |
-|--------------------|-----------|---------------------------------------|
-| `--brand-blue`     | `#349BD4` | Primary buttons, active nav           |
-| `--brand-blue-deep`| `#2B7FB0` | Hover / pressed                       |
-| `--brand-blue-light`| `#6EC1E4` | Highlights, focus rings, LATE status  |
-| `--brand-slate`    | `#3B464C` | Secondary text                        |
-| `--brand-gold`     | `#C8A98C` | Accents, KPIs                         |
-| `--brand-brown`    | `#836C68` | Tertiary accents                      |
-| `--status-success` | `#3FA66E` | PAID, PRESENT, settled                |
-| `--status-warning` | `#C8A98C` | PENDING, partial, late                |
-| `--status-danger`  | `#C0504D` | UNPAID, ABSENT, errors                |
-| `--status-info`    | `#6EC1E4` | Info toasts                           |
-
-### Typography
-
-- **Primary**: Inter (UI + body)
-- **Arabic**: Noto Sans Arabic (RTL fallback)
-- **Monospace**: JetBrains Mono (IDs, currency, audit JSON diffs)
-
-### Dark theme (default)
-
-Long operational hours — dark is the platform default. Light theme tokens are defined for future parity.
+### Desktop App (Electron)
+- ✅ Settings → Configuration tab — ALL settings configurable from UI
+- ✅ Settings → Inscriptions tab — approval workflow (web registration → admin approval)
+- ✅ Unified Modal System — 100% of modals use UnifiedModal
+- ✅ Mock fallback — works without Supabase for development
+- ✅ 1015 tests passing
+- ✅ Particle intro animation + dark theme + FR/AR RTL support
 
 ---
 
-## Domain model (plan §04–§12)
+## 🆘 Need Help?
 
-The full entity model lives in `src/domain/model/`. Highlights:
-
-- **Parent-first dependency** (plan §04.01): `students.parent_id` is NOT NULL. No student can exist without a parent. Enforced at the repository layer.
-- **Atomic batch registration** (plan §04.03): `StudentRepository.batchRegister(input)` wraps Parent + N Students creation in a single transaction (mock simulates via single in-memory update + one audit entry).
-- **Grading formula** (plan §06): `subject_average = (D1 + D2 + 2·Examen) / 4`, `overall_gpa = Σ(avg × coef) / Σ(coef)`, passing grade 10/20. Pure functions in `domain/model/academic.ts`.
-- **Two-tier expense workflow** (plan §08): `draft → submitted → approved/rejected → disbursed → settled`. Receipt upload mandatory before close. No self-approval.
-- **5-bucket debt aging**: `0-30 / 31-60 / 61-90 / 91-180 / 180+` days.
-
----
-
-## RBAC (plan §02.07)
-
-**6 roles** (4 staff + 2 client): SuperAdmin, FinancialOfficer, Teacher, SupportStaff, Parent, Student.
-**28 permissions** grouped by domain: CRM, Academic, Financial, Expense, HR, Routing, Settings.
-
-### Three-layer gating
-
-1. **FeatureRegistry** (`core/rbac/feature-registry.ts`) — single source of truth. Every sidebar entry, page, and action carries an `AccessRequirement`.
-2. **FeatureGate** (`core/rbac/feature-gate.ts`) — pure evaluator. Returns `Enabled | Disabled(reason) | Hidden`.
-3. **GatedContent** (`shared/components/gated-content.tsx`) — React wrapper. Renders children, or a locked state at 40% opacity with a lock icon, or nothing (Hidden).
-
-To change a permission rule, edit ONE file: `feature-registry.ts`. UI components consume the rule declaratively.
-
----
-
-## Audit log (plan §12)
-
-Every state-changing operation writes an audit entry with:
-- `action` (e.g. `payment.create`, `expense.approve`)
-- `entityType`, `entityId`
-- `actorId`, `actorName`
-- `diff` — JSON `{before, after}` snapshots (never truncated)
-- `ipAddress`, `userAgent`, `at` (UTC ISO timestamp)
-
-The Settings → Audit Log tab (restricted to SuperAdmin + FinancialOfficer) provides:
-- Multi-column filtering (action, entity, actor)
-- JSON before/after diff drawer
-- Real-time stream (mock simulates via `SubjectBehavior`)
-
-Anonymous operations are **impossible** — system actions are attributed to a system user ID.
-
----
-
-## Mock data layer
-
-The mock layer (`infrastructure/mock/`) ships with realistic seed data so the UI runs end-to-end without a backend:
-
-- 8 parents (FR/AR mix, T1/T2/T3 city tiers)
-- 15 students (across Primaire/CEM/Lycée)
-- 6 classes (2 per cycle)
-- 12 subjects (Scolarité + extracurricular)
-- 30 payments (mix of cash/check/transfer, all statuses)
-- 18 installments (Tuition 3-tranche pattern)
-- 5 expenses (covering all workflow states)
-- 10 personnel (5 categories)
-- 15 audit entries (covering all action types)
-- 6 notifications
-
-### Swapping to Supabase
-
-When ready to wire the real backend:
-
-1. Create `src/infrastructure/supabase/supabase-repositories.ts` that implements the same 17 repository interfaces using `@supabase/supabase-js`.
-2. Export a `supabaseRepositories: Repositories` constant from that file.
-3. In `src/app/app.tsx`, change `<RepositoryProvider>` to pass `repositories={supabaseRepositories}`.
-
-No component code changes. The swap is one line.
-
----
-
-## What's implemented in this session
-
-### Fully implemented
-- **Project scaffold**: Electron + Vite + React + TS + Tailwind + shadcn-style primitives
-- **Design system**: All 13 brand + status color tokens, Inter/Noto Sans Arabic/JetBrains Mono fonts, dark theme default
-- **Core infrastructure**: `Result<T, E>`, `AppError`, 6-level logger with PII masking, audit actions, currency (DZD) / date / ID formatters
-- **RBAC**: 6 roles, 28 permissions, FeatureRegistry (single source of truth), FeatureGate (pure evaluator), GatedContent (declarative UI wrapper)
-- **Domain model**: All entities from plan §04–§12 (Parent, Student, Academic, Payment, Expense, Personnel, Operations, Audit)
-- **Repository contracts**: 17 interfaces covering every operation
-- **Mock data layer**: 17 in-memory reactive implementations with realistic seed data + audit logging
-- **State**: AuthContext (session persistence), ToastContext (popups), ModalContext (modal stack), RepositoryProvider (DI)
-- **Shared UI**: Button, Card, Input, Label, Dialog, Tabs, Badge, Avatar, ScrollArea, Separator, Tooltip, DropdownMenu, Progress, Textarea, Select — all shadcn-style
-- **App components**: StatusChip (5 tones), KpiCard, AsyncContent/LoadingState/ErrorState/EmptyState, PageHeader, GatedContent, ConfirmDialog, ToastViewport, ModalHost, ComingSoonCard
-- **Particle intro**: Pure TS particle engine ported from legacy codebase (logo/circular/linear modes, mouse-reactive spring physics)
-- **Auth shell**: Splash screen with particle EI monogram, login screen with 4 demo accounts + role picker
-- **App shell**: Collapsible sidebar (4 hubs + Routing + Settings), topbar (Cmd+K global search, alerts bell, profile menu), HashRouter
-- **Dashboard hub (Hub 1)**: 4-KPI grid, 12-month revenue bar chart, 5-bucket debt aging, demographics pie charts, alerts feed, See Details modal with 4 sub-tabs (Revenue/Departments/Demographics/Debt)
-- **Settings hub**: General, **Audit log viewer with JSON diff drawer (showcase feature)**, RBAC matrix viewer, AI BYOK config, Backup management stub, Locked features card
-
-### Scaffolded (structure correct, deep workflows deferred)
-- **CRM hub**: Parents tab fully functional (list, search, quick actions call/WhatsApp/email). Students tab shows roster. Batch registration tab shows coming-soon card.
-- **Academics hub**: Classes tab fully functional (capacity progress bars, fill-rate tone). Subjects & Homework tabs scaffolded.
-- **Financials hub**: KPI grid + Payments tab (list with status chips) + Debt tab (aging buckets) + Expenses tab (workflow states). Installments & Receipts tabs scaffolded.
-- **Personnel hub**: Directory tab fully functional (category-colored avatars, weekly hours progress). Relevé, Audit (redirects to Settings), Workflows tabs scaffolded.
-- **Routing hub**: Access-denied panel when user lacks `AccessDriverMode`; coming-soon card otherwise. (Routing is NOT in the business plan; included only as a stub for parity with the Android app.)
-
-### Locked features (permanently disabled, shown in Settings)
-- AI assistant (Removed — module scaffolded for future)
-- AI report narrative (Not yet available)
-- AI expense anomaly (Not yet available)
-- Workflow DAG editor (Not yet available — desktop-only per plan §10)
-- Excel bulk import (Not yet available — desktop-only per plan §14)
-- Local backup (Not yet available — desktop-only per plan §13)
-- Point-in-time restore (Not yet available)
-
----
-
-## Conventions
-
-### File naming
-- React components: `kebab-case.tsx` (e.g. `status-chip.tsx`)
-- Pure TS modules: `kebab-case.ts`
-- Domain entities: singular (e.g. `parent.ts`, not `parents.ts`)
-
-### Import order
-1. External packages (React, Radix, lucide-react)
-2. `core/*` (pure infrastructure)
-3. `domain/*` (pure business model)
-4. `infrastructure/*` (adapters)
-5. `state/*` (React contexts)
-6. `shared/*` (UI primitives)
-7. Relative imports
-
-### ID formats (preserved from Android app)
-- Parent code: `PAR-{year}-{4-char suffix}` (e.g. `PAR-2025-A4F9`)
-- Student code: `ELV-{year}-{6-digit seq}` (e.g. `ELV-2025-001234`)
-- Receipt #: `REC-{year}-{6-digit seq}` (e.g. `REC-2025-000123`)
-- Personnel ID: `EMP-{year}-{3-digit seq}` (e.g. `EMP-2025-014`)
-- Backup file: `backup-YYYY-MM-DD-HHMMSS.db`
-
-### Currency
-All monetary values are DZD (Algerian Dinar). Format: `"12 500 DZD"` (non-breaking space grouping, `Locale.FRANCE`).
-
----
-
-## Plan compliance
-
-This implementation follows the plan **to the letter**. Where the user's prompt conflicted with the plan, the plan won:
-
-| Conflict                          | Plan ruling          | Implementation           |
-|-----------------------------------|----------------------|--------------------------|
-| Particle intro animation          | Not in plan (legacy) | Preserved as brand asset |
-| Routing/OSRM/TSP solver           | Not in plan          | Stubbed (locked)         |
-| Parent → N children (was 4-cap)   | Unlimited (§04.02)   | No cap                   |
-| Scholarships                      | PURGED (§07.04)      | Account Adjustments only |
-| Excel formula engine              | PURGED (§14)         | ExcelJS for I/E only     |
-| 5th attendance status             | Forbidden (§09.02)   | Exactly 4 statuses       |
-| 5th top-level Hub                 | Forbidden (§03.02)   | 4 hubs + Settings entry  |
-| Mobile backups                    | Forbidden (§13.05)   | N/A (desktop only)       |
-| `service_role` key in client      | Forbidden (§12.05)   | Will use anon key        |
-
----
-
-## License
-
-Proprietary — © El-Imtiyaz. All rights reserved.
+1. Check **[QUICKSTART.md](docs/QUICKSTART.md)** for the 15-minute setup
+2. Check **[BACKEND_SETUP_GUIDE.md](docs/BACKEND_SETUP_GUIDE.md)** for detailed instructions
+3. Check the **Troubleshooting** section in BACKEND_SETUP_GUIDE.md
+4. Check Supabase Dashboard logs (Database → Logs, Functions → Logs)
+5. Check the desktop app's DevTools console (View → Toggle Developer Tools)

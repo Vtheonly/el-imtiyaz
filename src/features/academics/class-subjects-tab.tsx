@@ -6,19 +6,19 @@
  */
 import { useState } from "react";
 import { BookOpen, User, Clock, Plus } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { useToast } from "../../state/toast-context";
+import { useToast } from "../../app/providers/toast-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../shared/ui/card";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
-import { EmptyState } from "../../shared/components/state-views";
+import { EmptyState } from "../../shared/layout/state-views";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../../shared/ui/select";
-import { FormField } from "../../shared/components/form-field";
+import { FormField } from "../../shared/ui/form-field";
 import { Input } from "../../shared/ui/input";
-import { UnifiedModal, type UnifiedModalProps } from "../../shared/components/unified-modal";
+import { UnifiedModal, type UnifiedModalProps } from "../../shared/ui/unified-modal";
 import type { AcademicLevel } from "../../domain/model/student";
 
 type Alert = NonNullable<UnifiedModalProps["alert"]>;

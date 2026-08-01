@@ -6,11 +6,11 @@
  */
 import { useState } from "react";
 import { Calendar, CheckCircle2, AlertCircle, XCircle, Clock } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../shared/ui/card";
-import { EmptyState } from "../../shared/components/state-views";
-import { StatusChip } from "../../shared/components/status-chip";
+import { EmptyState } from "../../shared/layout/state-views";
+import { StatusChip } from "../../shared/ui/status-chip";
 import { formatDate } from "../../core/format/date";
 import {
   ATTENDANCE_STATUS_LABELS_FR,

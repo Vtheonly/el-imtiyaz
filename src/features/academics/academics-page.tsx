@@ -9,14 +9,14 @@
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Plus, Download, Filter, ChevronRight, School, BookOpen, ClipboardList } from "lucide-react";
-import { PageHeader } from "../../shared/components/page-header";
+import { PageHeader } from "../../shared/layout/page-header";
 import { Card, CardContent } from "../../shared/ui/card";
-import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/components/page-tabs";
+import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/layout/page-tabs";
 import { Button } from "../../shared/ui/button";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
 import { Progress } from "../../shared/ui/progress";
-import { ComingSoonCard } from "../../shared/components/coming-soon-card";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { ComingSoonCard } from "../../shared/layout/coming-soon-card";
+import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { LEVEL_LABELS_FR } from "../../domain/model/student";
 import { HomeworkPushModal } from "./homework-push-modal";
@@ -26,6 +26,9 @@ import { useState } from "react";
 
 export function AcademicsPage() {
   const { t } = useTranslation();
+  const repos = useRepositories();
+  const classes = useObservable(() => repos.classes.observe(), []);
+  const subjects = useObservable(() => repos.subjects.observe(), []);
   const [homeworkOpen, setHomeworkOpen] = useState(false);
 
   return (
@@ -45,8 +48,8 @@ export function AcademicsPage() {
       />
       <PageTabs defaultValue="classes" className="flex-1 flex flex-col px-6 pb-6 min-h-0">
         <PageTabList>
-          <PageTab value="classes" label="Classes" icon={School} />
-          <PageTab value="subjects" label="Matières" icon={BookOpen} />
+          <PageTab value="classes" label="Classes" icon={School} count={classes.length} />
+          <PageTab value="subjects" label="Matières" icon={BookOpen} count={subjects.length} />
           <PageTab value="homework" label="Devoirs" icon={ClipboardList} />
         </PageTabList>
         <PageTabContent value="classes">

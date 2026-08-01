@@ -23,19 +23,20 @@ import {
   Wallet,
   AlertTriangle,
   Users,
+  Download,
 } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { useToast } from "../../state/toast-context";
-import { useAuth } from "../../state/auth-context";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { useToast } from "../../app/providers/toast-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { UnifiedModal } from "../../shared/components/unified-modal";
+import { UnifiedModal } from "../../shared/ui/unified-modal";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
 import { Separator } from "../../shared/ui/separator";
-import { StatusChip } from "../../shared/components/status-chip";
-import { MoneyInput } from "../../shared/components/money-input";
-import { FormField } from "../../shared/components/form-field";
+import { StatusChip } from "../../shared/ui/status-chip";
+import { MoneyInput } from "../../shared/ui/money-input";
+import { FormField } from "../../shared/ui/form-field";
 import { Textarea } from "../../shared/ui/textarea";
 import { formatDzd, formatDzdPlain } from "../../core/format/currency";
 import { formatRelative, formatDate } from "../../core/format/date";
@@ -45,6 +46,7 @@ import {
   PAYMENT_CATEGORY_LABELS_FR,
 } from "../../domain/model/payment";
 import { Permission } from "../../core/rbac/permissions";
+import { generateAccountStatementPdf, downloadPdf } from "../../infrastructure/receipt-pdf";
 
 export function ParentDetailDrawer({
   parentId,
@@ -58,6 +60,7 @@ export function ParentDetailDrawer({
   onAddChild?: (parentId: string) => void;
 }) {
   const repos = useRepositories();
+  const toast = useToast();
   const parent = useObservable(
     () => repos.parents.observeById(parentId ?? ""),
     [parentId],
@@ -70,12 +73,33 @@ export function ParentDetailDrawer({
     () => repos.debt.observeParentProfile(parentId ?? ""),
     [parentId],
   );
+  const payments = useObservable(
+    () => repos.payments.observeByParent(parentId ?? ""),
+    [parentId],
+  );
 
   if (!open || !parentId || !parent) return null;
 
   const initials = `${parent.firstName[0] ?? ""}${parent.lastName[0] ?? ""}`.toUpperCase();
   const outstanding = financialProfile?.totalOutstanding ?? 0;
   const overdue = financialProfile?.overdueAmount ?? 0;
+
+  // Iteration 6: Wire up the "Reçu PDF" button — generates a full account
+  // statement PDF for the parent and triggers a browser download.
+  async function handleDownloadStatement() {
+    if (!parent || payments.length === 0) {
+      toast.showWarning("Aucun paiement", "Ce parent n'a aucun paiement à inclure dans le relevé.");
+      return;
+    }
+    try {
+      const pdfBytes = await generateAccountStatementPdf(payments, parent);
+      const fileName = `releve-compte-${parent.code}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      downloadPdf(pdfBytes, fileName);
+      toast.showSuccess("Relevé téléchargé", fileName);
+    } catch (e) {
+      toast.showError("Échec du téléchargement", e instanceof Error ? e.message : String(e));
+    }
+  }
 
   return (
     <UnifiedModal
@@ -120,7 +144,13 @@ export function ParentDetailDrawer({
                 <Mail className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="outline" size="icon" title="Reçu PDF" disabled>
+            <Button
+              variant="outline"
+              size="icon"
+              title="Relevé de compte PDF"
+              onClick={handleDownloadStatement}
+              disabled={payments.length === 0}
+            >
               <FileText className="h-4 w-4" />
             </Button>
           </div>

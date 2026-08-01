@@ -6,14 +6,14 @@
  */
 import { useState } from "react";
 import { Clock, Save, Loader2 } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { useToast } from "../../state/toast-context";
-import { useAuth } from "../../state/auth-context";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { useToast } from "../../app/providers/toast-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../shared/ui/card";
 import { Button } from "../../shared/ui/button";
 import { Input } from "../../shared/ui/input";
 import { Label } from "../../shared/ui/label";
-import { FormField } from "../../shared/components/form-field";
+import { FormField } from "../../shared/ui/form-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
 import {
   RELEVE_ACTIVITY_LABELS_FR,

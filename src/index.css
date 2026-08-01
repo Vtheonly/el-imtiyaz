@@ -73,8 +73,10 @@
     --topbar-height: 56px;
   }
 
-  .light {
-    /* Light theme — for future parity. Dark is the platform default. */
+  .light,
+  [data-theme="light"] {
+    /* Light theme — for daytime operation / low-glare environments.
+       Dark is the platform default (set in index.html <html class="dark">). */
     --surface-background: #f7f9fb;
     --surface-panel: #ffffff;
     --surface-elevated: #ffffff;

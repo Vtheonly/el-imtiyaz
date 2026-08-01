@@ -7,13 +7,43 @@
  *   - 6 classes (2 per cycle)
  *   - 12 subjects (mix of Scolarité + extracurricular)
  *   - 30 payments across the last 12 months
- *   - 18 installments
  *   - 5 expenses (mixed statuses)
  *   - 10 personnel
  *   - 15 audit entries
  *
  * IDs are deterministic so cross-references are stable. Currency = DZD.
+ *
+ * Iteration 5: ALL financial amounts are derived from the PricingConfig
+ * (the single source of truth). The `seedInstallments` array is now
+ * derived from the ledger via `ledger-seed.ts` (see `installmentsFromLedger()`).
+ *
+ * Iteration 6:
+ *   - Each parent now carries an explicit `transportDestination` (canonical)
+ *     alongside the legacy `cityTier`. New code prefers `transportDestination`.
+ *   - Each student now carries an explicit `gradeLevel` (canonical) alongside
+ *     the legacy `level`+`gradeYear` pair.
+ *   - Tuition is now keyed by `GradeLevel` (14 grades) and payments derive
+ *     amounts from the granular per-grade pricing.
+ *
+ * No hardcoded DZD amounts in seed data except as PricingConfig-derived
+ * values (in `pricing-seed.ts`) or as illustrative expense amounts.
  */
+
+import {
+  tuitionForLevel,
+  tuitionForGradeLevel,
+  tuitionTranches,
+  tuitionTranchesForGrade,
+} from "../../domain/model/pricing";
+import {
+  gradeLevelFromLevelYear,
+  type GradeLevel,
+} from "../../domain/model/student";
+import {
+  cityTierToDestination,
+  type TransportDestination,
+} from "../../domain/model/parent";
+import { defaultPricingConfig } from "./pricing-seed";
 
 const NOW = new Date("2025-09-15T10:00:00Z");
 const iso = (d: Date) => d.toISOString();
@@ -37,10 +67,17 @@ export const seedParents = [
 ].map((p) => ({
   ...p,
   tenantId: TENANT_ID,
+  transportDestination: cityTierToDestination(p.cityTier) as TransportDestination,
   avatarUrl: null,
   createdAt: daysAgo(180),
   updatedAt: daysAgo(7),
 }));
+
+// Helper: derive gradeLevel from level + gradeYear (used for seed students
+// whose data was authored before the GradeLevel type was introduced).
+function gradeLevelFor(level: "primaire" | "cem" | "lycee", gradeYear: number): GradeLevel {
+  return gradeLevelFromLevelYear(level, gradeYear);
+}
 
 export const seedStudents = [
   { id: "stu-001", code: "ELV-2025-000001", parentId: "par-001", firstName: "Yacine", lastName: "Benali", gender: "male" as const, birthDate: "2014-03-12", level: "primaire" as const, gradeYear: 3, classId: "cls-001", medicalNotes: null },
@@ -61,6 +98,7 @@ export const seedStudents = [
 ].map((s) => ({
   ...s,
   tenantId: TENANT_ID,
+  gradeLevel: gradeLevelFor(s.level, s.gradeYear),
   enrollmentDate: daysAgo(120),
   photoUrl: null,
   transportTier: s.level === "primaire" ? "t1" : null,
@@ -104,17 +142,26 @@ export const seedPayments = Array.from({ length: 30 }, (_, i) => {
   const method = methods[i % methods.length];
   const status = statuses[i % statuses.length];
   const category = categories[i % categories.length];
+  // Use the same source IDs as the ledger so cross-checks pass.
+  const installmentId = i % 3 === 0 && student ? `ins-${parent.id}-${student.id}-t${(i % 3) + 1}` : null;
+  // Derive tuition amount from the granular grade-level 3-tranche schedule.
+  // Iteration 6: prefers per-grade-level pricing; falls back to legacy if needed.
+  const tuitionTrancheAmount = student
+    ? tuitionTranchesForGrade(defaultPricingConfig, student.gradeLevel)[i % 3].amountDue
+    : tuitionTranches(tuitionForLevel(defaultPricingConfig, "cem"))[i % 3].amountDue;
   return {
     id: `pay-${String(i + 1).padStart(3, "0")}`,
     tenantId: TENANT_ID,
     receiptNumber: `REC-2025-${String(i + 1).padStart(6, "0")}`,
     parentId: parent.id,
     studentId: student?.id ?? null,
-    amount: [12500, 8000, 3500, 5000, 15000, 6000, 4200][i % 7],
+    amount: category === "tuition"
+      ? tuitionTrancheAmount
+      : [8000, 3500, 5000, 6000, 4200][i % 5],
     method,
     status,
     category,
-    installmentId: i % 3 === 0 ? `ins-${String((i % 6) + 1).padStart(3, "0")}` : null,
+    installmentId,
     proofUrl: method !== "cash" ? "mock://proof/scan.jpg" : null,
     notes: method !== "cash" ? "Chèque en attente de compensation" : null,
     collectedBy: "usr-fin-001",
@@ -124,21 +171,41 @@ export const seedPayments = Array.from({ length: 30 }, (_, i) => {
   };
 });
 
+/**
+ * Installment records — view onto ledger charge entries.
+ *
+ * Iteration 5: installments are now derived from the ledger. The
+ * `seedInstallments` array is kept as a backward-compat shim for code
+ * that consumes `Installment` objects directly. The amounts come from
+ * `defaultPricingConfig.tuitionByGradeLevel` (the single source of truth).
+ *
+ * Iteration 6: uses per-grade-level tuition (granular 3-tranche schedule)
+ * instead of the legacy 3-way equal split.
+ */
 export const seedInstallments = seedParents.slice(0, 6).flatMap((parent, idx) => {
+  const student = seedStudents.find((s) => s.parentId === parent.id);
+  if (!student) return [];
+  const tranches = tuitionTranchesForGrade(defaultPricingConfig, student.gradeLevel);
+  // Iteration 9: derive cycle from student level — drives default due-date template.
+  const cycle = student.level as "primaire" | "cem" | "lycee";
   return [1, 2, 3].map((t) => {
     const due = new Date(NOW.getTime() + (t - 2) * 30 * 86_400_000);
+    const amountDue = tranches[t - 1].amountDue;
     const paid = t < 3 || (t === 3 && idx % 2 === 0);
     return {
-      id: `ins-${String(idx * 3 + t).padStart(3, "0")}`,
+      id: `ins-${parent.id}-${student.id}-t${t}`,
       parentId: parent.id,
-      studentId: seedStudents.find((s) => s.parentId === parent.id)?.id ?? null,
+      studentId: student.id,
       category: "tuition" as const,
       label: `Tranche ${t}`,
-      amountDue: 18000,
-      amountPaid: paid ? 18000 : t === 2 ? 9000 : 0,
+      amountDue,
+      amountPaid: paid ? amountDue : t === 2 ? Math.round(amountDue / 2) : 0,
       dueDate: iso(due),
       paidDate: paid ? iso(due) : null,
       status: paid ? "paid" as const : t === 2 ? "partial" as const : "pending" as const,
+      academicCycle: cycle,
+      customSchedule: false,
+      customScheduleNote: null,
     };
   });
 });
@@ -151,18 +218,40 @@ export const seedExpenses = [
   { id: "exp-005", requestCode: "EXP-2025-005", title: "Carburant bus scolaire octobre", description: "Plein diesel hebdomadaire × 4", amount: 32000, category: "transport" as const, payee: "Naftal", status: "rejected" as const, submittedBy: "usr-sup-001", submittedAt: daysAgo(8), approvedBy: "usr-adm-001", approvedAt: daysAgo(7), approvalNote: "Rejet: justificatif manquant, refaire la demande", disbursedBy: null, disbursedAt: null, proofUrl: null, proofUploadedBy: null, proofUploadedAt: null, anomalyScore: null, anomalyNote: null },
 ].map((e) => ({ ...e, tenantId: TENANT_ID }));
 
+import { Role } from "../../core/rbac/roles";
+
 export const seedPersonnel = [
-  { id: "per-001", firstName: "Aïcha", lastName: "Bouhenni", staffCategory: "teacher" as const, phone: "+213 555 11 22 33", email: "a.bouhenni@elimtiyaz.dz", hireDate: "2020-09-01", salary: 65000, weeklyHoursTarget: 30, weeklyHoursLogged: 28, status: "active" as const },
-  { id: "per-002", firstName: "Sofiane", lastName: "Larbi", staffCategory: "teacher" as const, phone: "+213 661 22 33 44", email: "s.larbi@elimtiyaz.dz", hireDate: "2022-09-15", salary: 58000, weeklyHoursTarget: 30, weeklyHoursLogged: 32, status: "active" as const },
-  { id: "per-003", firstName: "Nadia", lastName: "Hamidi", staffCategory: "teacher" as const, phone: "+213 770 33 44 55", email: "n.hamidi@elimtiyaz.dz", hireDate: "2019-09-01", salary: 72000, weeklyHoursTarget: 30, weeklyHoursLogged: 25, status: "active" as const },
-  { id: "per-004", firstName: "Karim", lastName: "Zidane", staffCategory: "teacher" as const, phone: "+213 555 44 55 66", email: "k.zidane@elimtiyaz.dz", hireDate: "2021-09-01", salary: 70000, weeklyHoursTarget: 30, weeklyHoursLogged: 30, status: "active" as const },
-  { id: "per-005", firstName: "Samira", lastName: "Belmiloud", staffCategory: "teacher" as const, phone: "+213 661 55 66 77", email: "s.belmiloud@elimtiyaz.dz", hireDate: "2018-09-01", salary: 78000, weeklyHoursTarget: 30, weeklyHoursLogged: 27, status: "active" as const },
-  { id: "per-006", firstName: "Hocine", lastName: "Rebai", staffCategory: "teacher" as const, phone: "+213 770 66 77 88", email: "h.rebai@elimtiyaz.dz", hireDate: "2023-02-01", salary: 62000, weeklyHoursTarget: 30, weeklyHoursLogged: 29, status: "active" as const },
-  { id: "per-007", firstName: "Brahim", lastName: "Souilah", staffCategory: "administration" as const, phone: "+213 555 77 88 99", email: "b.souilah@elimtiyaz.dz", hireDate: "2017-09-01", salary: 85000, weeklyHoursTarget: 40, weeklyHoursLogged: 38, status: "active" as const },
-  { id: "per-008", firstName: "Toufik", lastName: "Ammar", staffCategory: "support" as const, phone: "+213 661 88 99 00", email: "t.ammar@elimtiyaz.dz", hireDate: "2022-01-15", salary: 42000, weeklyHoursTarget: 40, weeklyHoursLogged: 40, status: "active" as const },
-  { id: "per-009", firstName: "Said", lastName: "Bouzid", staffCategory: "maintenance" as const, phone: "+213 770 99 00 11", email: null, hireDate: "2020-03-01", salary: 38000, weeklyHoursTarget: 40, weeklyHoursLogged: 36, status: "active" as const },
-  { id: "per-010", firstName: "Messaoud", lastName: "Khalfaoui", staffCategory: "driver" as const, phone: "+213 555 00 11 22", email: null, hireDate: "2021-09-01", salary: 45000, weeklyHoursTarget: 35, weeklyHoursLogged: 33, status: "on_leave" as const },
-].map((p) => ({ ...p, id: p.id, tenantId: TENANT_ID, avatarUrl: null }));
+  { id: "per-001", userId: "usr-tea-001", firstName: "Aïcha", lastName: "Bouhenni", staffCategory: "teacher" as const, roleId: Role.Teacher, departmentId: "dept-teachers", supervisorId: "per-014", position: "Professeur de Mathématiques", phone: "+213 555 11 22 33", email: "a.bouhenni@elimtiyaz.dz", hireDate: "2020-09-01", salary: 65000, weeklyHoursTarget: 30, weeklyHoursLogged: 28, status: "active" as const },
+  { id: "per-002", userId: null, firstName: "Sofiane", lastName: "Larbi", staffCategory: "teacher" as const, roleId: Role.Teacher, departmentId: "dept-teachers", supervisorId: "per-014", position: "Professeur de Français", phone: "+213 661 22 33 44", email: "s.larbi@elimtiyaz.dz", hireDate: "2022-09-15", salary: 58000, weeklyHoursTarget: 30, weeklyHoursLogged: 32, status: "active" as const },
+  { id: "per-003", userId: null, firstName: "Nadia", lastName: "Hamidi", staffCategory: "teacher" as const, roleId: Role.Teacher, departmentId: "dept-teachers", supervisorId: "per-014", position: "Professeur d'Arabe", phone: "+213 770 33 44 55", email: "n.hamidi@elimtiyaz.dz", hireDate: "2019-09-01", salary: 72000, weeklyHoursTarget: 30, weeklyHoursLogged: 25, status: "active" as const },
+  { id: "per-004", userId: null, firstName: "Karim", lastName: "Zidane", staffCategory: "teacher" as const, roleId: Role.Teacher, departmentId: "dept-teachers", supervisorId: "per-014", position: "Professeur de Sciences", phone: "+213 555 44 55 66", email: "k.zidane@elimtiyaz.dz", hireDate: "2021-09-01", salary: 70000, weeklyHoursTarget: 30, weeklyHoursLogged: 30, status: "active" as const },
+  { id: "per-005", userId: null, firstName: "Samira", lastName: "Belmiloud", staffCategory: "teacher" as const, roleId: Role.Teacher, departmentId: "dept-teachers", supervisorId: "per-014", position: "Professeur d'Histoire-Géo", phone: "+213 661 55 66 77", email: "s.belmiloud@elimtiyaz.dz", hireDate: "2018-09-01", salary: 78000, weeklyHoursTarget: 30, weeklyHoursLogged: 27, status: "active" as const },
+  { id: "per-006", userId: null, firstName: "Hocine", lastName: "Rebai", staffCategory: "teacher" as const, roleId: Role.Teacher, departmentId: "dept-teachers", supervisorId: "per-014", position: "Professeur d'EPS", phone: "+213 770 66 77 88", email: "h.rebai@elimtiyaz.dz", hireDate: "2023-02-01", salary: 62000, weeklyHoursTarget: 30, weeklyHoursLogged: 29, status: "active" as const },
+  { id: "per-007", userId: "usr-adm-001", firstName: "Brahim", lastName: "Souilah", staffCategory: "administration" as const, roleId: Role.SuperAdmin, departmentId: "dept-admin", supervisorId: null, position: "Directeur", phone: "+213 555 77 88 99", email: "b.souilah@elimtiyaz.dz", hireDate: "2017-09-01", salary: 85000, weeklyHoursTarget: 40, weeklyHoursLogged: 38, status: "active" as const },
+  { id: "per-008", userId: "usr-fin-001", firstName: "Fatima", lastName: "Belkacem", staffCategory: "administration" as const, roleId: Role.FinancialOfficer, departmentId: "dept-accounting", supervisorId: "per-007", position: "Agent Financier", phone: "+213 661 88 99 00", email: "f.belkacem@elimtiyaz.dz", hireDate: "2019-09-01", salary: 70000, weeklyHoursTarget: 40, weeklyHoursLogged: 40, status: "active" as const },
+  { id: "per-009", userId: "usr-sup-001", firstName: "Toufik", lastName: "Ammar", staffCategory: "support" as const, roleId: Role.SupportStaff, departmentId: "dept-admin", supervisorId: "per-007", position: "Accueil", phone: "+213 770 88 99 00", email: "t.ammar@elimtiyaz.dz", hireDate: "2022-01-15", salary: 42000, weeklyHoursTarget: 40, weeklyHoursLogged: 40, status: "active" as const },
+  { id: "per-010", userId: "usr-wrk-001", firstName: "Said", lastName: "Bouzid", staffCategory: "maintenance" as const, roleId: Role.Worker, departmentId: "dept-workers", supervisorId: "per-007", position: "Ouvrier polyvalent", phone: "+213 770 99 00 11", email: null, hireDate: "2020-03-01", salary: 38000, weeklyHoursTarget: 40, weeklyHoursLogged: 36, status: "active" as const },
+  { id: "per-011", userId: "usr-drv-001", firstName: "Messaoud", lastName: "Khalfaoui", staffCategory: "driver" as const, roleId: Role.Driver, departmentId: "dept-drivers", supervisorId: "per-007", position: "Chauffeur livreur", phone: "+213 555 00 11 22", email: null, hireDate: "2021-09-01", salary: 45000, weeklyHoursTarget: 35, weeklyHoursLogged: 33, status: "on_leave" as const },
+  { id: "per-012", userId: "usr-buy-001", firstName: "Yacine", lastName: "Mansouri", staffCategory: "buyer" as const, roleId: Role.Buyer, departmentId: "dept-buyers", supervisorId: "per-007", position: "Acheteur", phone: "+213 555 11 22 00", email: "y.mansouri@elimtiyaz.dz", hireDate: "2022-09-01", salary: 55000, weeklyHoursTarget: 40, weeklyHoursLogged: 38, status: "active" as const },
+  { id: "per-013", userId: "usr-whw-001", firstName: "Rachid", lastName: "Hadj", staffCategory: "warehouse" as const, roleId: Role.WarehouseWorker, departmentId: "dept-warehouse", supervisorId: "per-007", position: "Magasinier", phone: "+213 661 22 00 33", email: "r.hadj@elimtiyaz.dz", hireDate: "2023-01-15", salary: 40000, weeklyHoursTarget: 40, weeklyHoursLogged: 39, status: "active" as const },
+  { id: "per-014", userId: "usr-mgr-001", firstName: "Leïla", lastName: "Cherif", staffCategory: "administration" as const, roleId: Role.Manager, departmentId: "dept-teachers", supervisorId: "per-007", position: "Responsable pédagogique", phone: "+213 770 33 00 55", email: "l.cherif@elimtiyaz.dz", hireDate: "2018-09-01", salary: 80000, weeklyHoursTarget: 40, weeklyHoursLogged: 41, status: "active" as const },
+  { id: "per-015", userId: null, firstName: "Omar", lastName: "Boudjelal", staffCategory: "worker" as const, roleId: Role.Worker, departmentId: "dept-workers", supervisorId: "per-014", position: "Ouvrier d'entretien", phone: "+213 555 44 00 66", email: null, hireDate: "2024-01-10", salary: 36000, weeklyHoursTarget: 40, weeklyHoursLogged: 40, status: "active" as const },
+].map((p) => ({
+  ...p,
+  id: p.id,
+  tenantId: TENANT_ID,
+  avatarUrl: null,
+  address: null,
+  terminationDate: null,
+  paymentMethod: "bank_transfer" as const,
+  bankAccount: null,
+  bonuses: [] as never[],
+  documents: [] as never[],
+  notes: [] as never[],
+  emergencyContact: null,
+  dateOfBirth: null,
+  nationalId: null,
+}));
 
 export const seedAudit = [
   { id: "aud-001", action: "auth.login", entityType: "session", entityId: "sess-001", actorId: "usr-adm-001", actorName: "Brahim Souilah", diff: null, note: "Connexion réussie", at: daysAgo(0) },
@@ -183,18 +272,81 @@ export const seedAudit = [
 ].map((a) => ({ ...a, tenantId: TENANT_ID, ipAddress: "10.0.1.42", userAgent: "El-Imtiyaz-Desktop/0.1.0" }));
 
 export const seedNotifications = [
-  { id: "ntf-001", type: "payment_overdue" as const, title: "Créance en retard", body: "Famille Mansouri — 18 000 DZD en retard (61-90 j)", entityType: "parent", entityId: "par-003", readAt: null, createdAt: daysAgo(1) },
-  { id: "ntf-002", type: "expense_pending" as const, title: "Dépense en attente d'approbation", body: "EXP-2025-003 — 68 000 DZD (Facture électricité)", entityType: "expense", entityId: "exp-003", readAt: null, createdAt: daysAgo(2) },
-  { id: "ntf-003", type: "attendance_alert" as const, title: "Alerte absence", body: "Yacine Benali — 3 absences ce trimestre", entityType: "student", entityId: "stu-001", readAt: daysAgo(1), createdAt: daysAgo(3) },
-  { id: "ntf-004", type: "expense_pending" as const, title: "Anomalie détectée", body: "EXP-2025-003 — 3.2× moyenne catégorie utilities", entityType: "expense", entityId: "exp-003", readAt: daysAgo(2), createdAt: daysAgo(5) },
-  { id: "ntf-005", type: "homework" as const, title: "Nouveau devoir", body: "Classe 1ère B — Français: Lecture chapitre 3", entityType: "homework", entityId: "hw-001", readAt: null, createdAt: daysAgo(3) },
-  { id: "ntf-006", type: "system" as const, title: "Sauvegarde automatique", body: "Backup quotidien créé avec succès (02:00)", entityType: "backup", entityId: "bak-2025-09-15", readAt: daysAgo(1), createdAt: daysAgo(1) },
+  { id: "ntf-001", type: "payment_overdue" as const, priority: "high" as const, source: "system" as const, sourceLabel: "Module Finances", title: "Créance en retard", body: "Famille Mansouri — 18 000 DZD en retard (61-90 j)", entityType: "parent", entityId: "par-003", targetUserId: null, targetRole: null as Role | null, triggeredAt: null, readAt: null, createdAt: daysAgo(1), createdBy: "system" },
+  { id: "ntf-002", type: "expense_pending" as const, priority: "medium" as const, source: "system" as const, sourceLabel: "Module Dépenses", title: "Dépense en attente d'approbation", body: "EXP-2025-003 — 68 000 DZD (Facture électricité)", entityType: "expense", entityId: "exp-003", targetUserId: null, targetRole: Role.SuperAdmin as Role | null, triggeredAt: null, readAt: null, createdAt: daysAgo(2), createdBy: "system" },
+  { id: "ntf-003", type: "attendance_alert" as const, priority: "medium" as const, source: "system" as const, sourceLabel: "Module Pédagogie", title: "Alerte absence", body: "Yacine Benali — 3 absences ce trimestre", entityType: "student", entityId: "stu-001", targetUserId: null, targetRole: Role.Teacher as Role | null, triggeredAt: null, readAt: daysAgo(1), createdAt: daysAgo(3), createdBy: "system" },
+  { id: "ntf-004", type: "expense_pending" as const, priority: "high" as const, source: "system" as const, sourceLabel: "Module Dépenses — Anomalies", title: "Anomalie détectée", body: "EXP-2025-003 — 3.2× moyenne catégorie utilities", entityType: "expense", entityId: "exp-003", targetUserId: null, targetRole: Role.FinancialOfficer as Role | null, triggeredAt: null, readAt: daysAgo(2), createdAt: daysAgo(5), createdBy: "system" },
+  { id: "ntf-005", type: "homework" as const, priority: "low" as const, source: "system" as const, sourceLabel: "Module Pédagogie", title: "Nouveau devoir", body: "Classe 1ère B — Français: Lecture chapitre 3", entityType: "homework", entityId: "hw-001", targetUserId: null, targetRole: Role.Teacher as Role | null, triggeredAt: null, readAt: null, createdAt: daysAgo(3), createdBy: "system" },
+  { id: "ntf-006", type: "system" as const, priority: "low" as const, source: "system" as const, sourceLabel: "Sauvegardes", title: "Sauvegarde automatique", body: "Backup quotidien créé avec succès (02:00)", entityType: "backup", entityId: "bak-2025-09-15", targetUserId: null, targetRole: null as Role | null, triggeredAt: null, readAt: daysAgo(1), createdAt: daysAgo(1), createdBy: "system" },
+  // Iteration 9 — manual custom alert samples (provenance tracked)
+  { id: "ntf-007", type: "custom" as const, priority: "urgent" as const, source: "manual" as const, sourceLabel: "Alerte manuelle", title: "Réunion conseil d'établissement", body: "Réunion exceptionnelle demain à 14h en salle de conférence. Présence obligatoire.", entityType: null, entityId: null, targetUserId: null, targetRole: null as Role | null, triggeredAt: daysFromNow(1), readAt: null, createdAt: daysAgo(0), createdBy: "usr-adm-001" },
+  { id: "ntf-008", type: "custom" as const, priority: "medium" as const, source: "manual" as const, sourceLabel: "Personnel — Ouvrier", title: "Rappel entretien chaudière", body: "Faire vérifier la chaudière principale avant l'hiver.", entityType: null, entityId: null, targetUserId: "usr-wrk-001", targetRole: null as Role | null, triggeredAt: daysFromNow(3), readAt: null, createdAt: daysAgo(0), createdBy: "usr-adm-001" },
+];
+
+// Iteration 9 — manually scheduled calendar events (follow-up calls, reminders, meetings).
+export const seedCalendarEvents = [
+  {
+    id: "cal-001",
+    kind: "follow_up_call" as const,
+    date: new Date(NOW.getTime() + 1 * 86_400_000).toISOString().slice(0, 10),
+    time: "10:30",
+    title: "Appel de suivi — Famille Mansouri",
+    description: "Relancer pour le paiement de la 3ème tranche (échéance dépassée).",
+    sourceLabel: "Module Finances",
+    priority: "high" as const,
+    createdBy: "usr-fin-001",
+    assignedToUserId: "usr-fin-001",
+    assignedToRole: null as Role | null,
+    createdAt: daysAgo(1),
+    targetType: "parent" as const,
+    targetId: "par-003",
+    targetName: "Yacine Mansouri",
+    phone: "+213 770 34 56 78",
+  },
+  {
+    id: "cal-002",
+    kind: "meeting" as const,
+    date: new Date(NOW.getTime() + 2 * 86_400_000).toISOString().slice(0, 10),
+    time: "14:00",
+    title: "Réunion parents-professeurs — 1ère B",
+    description: "Bilan T1 + orientation.",
+    sourceLabel: "Module Pédagogie",
+    priority: "medium" as const,
+    createdBy: "usr-adm-001",
+    assignedToUserId: null,
+    assignedToRole: Role.Teacher as Role | null,
+    createdAt: daysAgo(2),
+    location: "Salle de conférence",
+    attendeeCount: 28,
+  },
+  {
+    id: "cal-003",
+    kind: "reminder" as const,
+    date: new Date(NOW.getTime() + 5 * 86_400_000).toISOString().slice(0, 10),
+    time: "09:00",
+    title: "Échéance — Tranche 3 Primaire",
+    description: "Tous les élèves du Primaire: 3ème tranche de scolarité.",
+    sourceLabel: "Module Finances",
+    priority: "high" as const,
+    createdBy: "system",
+    assignedToUserId: null,
+    assignedToRole: Role.FinancialOfficer as Role | null,
+    createdAt: daysAgo(10),
+    linkedEntityType: "installment",
+    linkedEntityId: null,
+  },
 ];
 
 // Demo accounts for the mock auth layer.
+// Iteration 8: added accounts for the new workforce roles (manager/buyer/driver/warehouse/worker).
 export const seedAccounts = [
   { email: "admin@elimtiyaz.dz", password: "admin123", userId: "usr-adm-001", displayName: "Brahim Souilah", role: "super_admin" as const },
   { email: "financial@elimtiyaz.dz", password: "fin123", userId: "usr-fin-001", displayName: "Fatima Belkacem (Fin)", role: "financial_officer" as const },
   { email: "teacher@elimtiyaz.dz", password: "teach123", userId: "usr-tea-001", displayName: "Aïcha Bouhenni", role: "teacher" as const },
   { email: "support@elimtiyaz.dz", password: "support123", userId: "usr-sup-001", displayName: "Toufik Ammar", role: "support_staff" as const },
+  { email: "manager@elimtiyaz.dz", password: "manager123", userId: "usr-mgr-001", displayName: "Leïla Cherif", role: "manager" as const },
+  { email: "buyer@elimtiyaz.dz", password: "buyer123", userId: "usr-buy-001", displayName: "Yacine Mansouri", role: "buyer" as const },
+  { email: "driver@elimtiyaz.dz", password: "driver123", userId: "usr-drv-001", displayName: "Messaoud Khalfaoui", role: "driver" as const },
+  { email: "warehouse@elimtiyaz.dz", password: "warehouse123", userId: "usr-whw-001", displayName: "Rachid Hadj", role: "warehouse_worker" as const },
+  { email: "worker@elimtiyaz.dz", password: "worker123", userId: "usr-wrk-001", displayName: "Said Bouzid", role: "worker" as const },
 ];

@@ -5,12 +5,12 @@
  * Uses GradeRepository.observeForClass(classId).
  */
 import { GraduationCap } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../shared/ui/card";
 import { Badge } from "../../shared/ui/badge";
-import { EmptyState } from "../../shared/components/state-views";
-import { StatusChip } from "../../shared/components/status-chip";
+import { EmptyState } from "../../shared/layout/state-views";
+import { StatusChip } from "../../shared/ui/status-chip";
 import { formatDate } from "../../core/format/date";
 
 export function ClassGradesTab({ classId }: { classId: string }) {

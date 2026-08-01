@@ -17,7 +17,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import {
   UnifiedModal,
   ConfirmModal,
-} from "../../shared/components/unified-modal";
+} from "../../shared/ui/unified-modal";
 import { Plus } from "lucide-react";
 
 describe("UnifiedModal — dialog variant", () => {

@@ -14,18 +14,18 @@
  */
 import { useState } from "react";
 import { FileText, Download, Search, Loader2, FileBarChart, User } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { useDebounce } from "../../shared/hooks/use-debounce";
-import { useToast } from "../../state/toast-context";
+import { useToast } from "../../app/providers/toast-provider";
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from "../../shared/ui/card";
 import { Button } from "../../shared/ui/button";
 import { Input } from "../../shared/ui/input";
 import { Badge } from "../../shared/ui/badge";
-import { StatusChip } from "../../shared/components/status-chip";
-import { EmptyState } from "../../shared/components/state-views";
+import { StatusChip } from "../../shared/ui/status-chip";
+import { EmptyState } from "../../shared/layout/state-views";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../../shared/ui/select";
@@ -40,7 +40,7 @@ import {
   generatePaymentReceiptPdf,
   generateAccountStatementPdf,
   downloadPdf,
-} from "../../infrastructure/pdf/receipt-pdf";
+} from "../../infrastructure/receipt-pdf";
 import type { Payment, Parent } from "../../domain/model";
 
 export function ReceiptsTab() {

@@ -10,15 +10,15 @@
  */
 import { useState } from "react";
 import { Send, Upload, X, BookOpen } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { useToast } from "../../state/toast-context";
-import { useAuth } from "../../state/auth-context";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { useToast } from "../../app/providers/toast-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { UnifiedModal, type UnifiedModalProps } from "../../shared/components/unified-modal";
+import { UnifiedModal, type UnifiedModalProps } from "../../shared/ui/unified-modal";
 import { Button } from "../../shared/ui/button";
 import { Input } from "../../shared/ui/input";
 import { Textarea } from "../../shared/ui/textarea";
-import { FormField } from "../../shared/components/form-field";
+import { FormField } from "../../shared/ui/form-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
 import { toIsoDay } from "../../core/format/date";
 

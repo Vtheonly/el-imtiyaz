@@ -1,5 +1,6 @@
 import { app, dialog, BrowserWindow } from "electron";
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, readFile, unlink } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 /**
  * IPC handler registration.
@@ -60,6 +61,69 @@ export function registerIpcHandlers(ipcMain, _deps) {
         catch (err) {
             return { ok: false, error: err.message };
         }
+    });
+    // ==========================================================================
+    // Local config (config.json in userData) — for Supabase URL + anon key +
+    // feature flags that must be available BEFORE the Supabase client initializes.
+    // ==========================================================================
+    ipcMain.handle("config:read", async () => {
+        try {
+            const configPath = join(app.getPath("userData"), "config.json");
+            if (!existsSync(configPath)) {
+                return { ok: true, config: {} };
+            }
+            const raw = await readFile(configPath, "utf-8");
+            const config = JSON.parse(raw);
+            return { ok: true, config };
+        }
+        catch (err) {
+            return { ok: false, error: err.message };
+        }
+    });
+    ipcMain.handle("config:write", async (_evt, config) => {
+        try {
+            const configPath = join(app.getPath("userData"), "config.json");
+            await mkdir(dirname(configPath), { recursive: true });
+            await writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
+            return { ok: true };
+        }
+        catch (err) {
+            return { ok: false, error: err.message };
+        }
+    });
+    ipcMain.handle("config:delete", async () => {
+        try {
+            const configPath = join(app.getPath("userData"), "config.json");
+            if (existsSync(configPath)) {
+                await unlink(configPath);
+            }
+            return { ok: true };
+        }
+        catch (err) {
+            return { ok: false, error: err.message };
+        }
+    });
+    // ==========================================================================
+    // App restart — required after changing Supabase connection settings so the
+    // renderer re-initializes the Supabase client with the new URL/key.
+    // ==========================================================================
+    ipcMain.handle("app:restart", async () => {
+        try {
+            // Relaunch the app and exit the current instance. Electron's relaunch()
+            // starts a new process; quit() terminates this one.
+            app.relaunch();
+            app.quit();
+            return { ok: true };
+        }
+        catch (err) {
+            return { ok: false, error: err.message };
+        }
+    });
+    // ==========================================================================
+    // Check if running in Electron (vs web browser)
+    // ==========================================================================
+    ipcMain.handle("app:is-electron", () => {
+        return true;
     });
 }
 /** Convenience helper exposed for tests / non-Electron environments. */

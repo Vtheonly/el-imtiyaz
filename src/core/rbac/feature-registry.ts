@@ -33,10 +33,27 @@ const t2 = "T2";
 
 // === Top-level sections (sidebar entries) ===
 
+/**
+ * Iteration 9 — Dashboard access control (spec §1.1).
+ *
+ * Teachers and non-administrative staff (Buyer, Driver, WarehouseWorker,
+ * Worker) are completely restricted from accessing the main
+ * administrative/financial dashboard. Only administrative roles
+ * (SuperAdmin, FinancialOfficer, SupportStaff, Manager) can view
+ * sensitive organizational or financial data.
+ *
+ * Per spec: "Teachers and non-administrative staff must be completely
+ * restricted from accessing the main administrative/financial dashboard."
+ */
 export const Dashboard: FeatureNode = {
   id: "section.dashboard",
   label: "Tableau de bord",
-  requirement: empty,
+  requirement: requiresRole([
+    R.SuperAdmin,
+    R.FinancialOfficer,
+    R.SupportStaff,
+    R.Manager,
+  ]),
 };
 
 export const Crm: FeatureNode = {
@@ -87,7 +104,25 @@ export const Personnel: FeatureNode = {
     { id: "pers.directory", label: "Annuaire", requirement: requiresPermission(P.ViewPersonnel) },
     { id: "pers.releve", label: "Relevé", requirement: requiresPermission(P.ViewReleve) },
     { id: "pers.audit_log", label: "Journal d'audit", requirement: requiresPermission(P.ViewAuditLog) },
-    { id: "pers.workflows", label: "Workflows", requirement: requiresRole([R.SuperAdmin]) },
+    { id: "pers.workflows", label: "Workflows", requirement: requiresPermission(P.ViewWorkflowRuns) },
+  ],
+};
+
+/**
+ * Iteration 7 — Workflow Automation section (plan §10).
+ *
+ * Visual DAG editor + workflow runs monitor. Desktop-only per plan §10.02
+ * (touchscreen DnD is impractical on mobile). The canvas is gated to
+ * SuperAdmin (manage_workflows); the runs monitor is visible to anyone
+ * with view_workflow_runs (SuperAdmin + FinancialOfficer).
+ */
+export const WorkflowAutomation: FeatureNode = {
+  id: "section.workflow_automation",
+  label: "Automatisations",
+  requirement: requiresAnyOf([P.ManageWorkflows, P.ViewWorkflowRuns]),
+  children: [
+    { id: "wf.editor", label: "Éditeur", requirement: requiresPermission(P.ManageWorkflows) },
+    { id: "wf.runs", label: "Exécutions", requirement: requiresPermission(P.ViewWorkflowRuns) },
   ],
 };
 
@@ -100,7 +135,7 @@ export const Routing: FeatureNode = {
 export const Settings: FeatureNode = {
   id: "section.settings",
   label: "Paramètres",
-  requirement: requiresAnyOf([P.ManageSettings, P.ViewAuditLog]),
+  requirement: requiresAnyOf([P.ManageSettings, P.ViewAuditLog, P.ManageBackups, P.ManageAIConfig]),
 };
 
 /** Top-level navigation — order matters (sidebar order). */
@@ -110,6 +145,7 @@ export const SIDEBAR_SECTIONS: readonly FeatureNode[] = [
   Academics,
   Financials,
   Personnel,
+  WorkflowAutomation,
   Routing,
   Settings,
 ];
@@ -117,6 +153,10 @@ export const SIDEBAR_SECTIONS: readonly FeatureNode[] = [
 /**
  * Permanently disabled features — surfaced in the Settings → Locked features
  * card so users see what's intentionally removed / desktop-only / future.
+ *
+ * Iteration 7: the AI / workflow / backup features are now UNLOCKED (built
+ * in this iteration). Only the Supabase adapter + mobile-only items remain
+ * locked because they require a real backend / mobile app to function.
  */
 export interface PermanentlyDisabledFeature {
   readonly id: string;
@@ -125,11 +165,8 @@ export interface PermanentlyDisabledFeature {
 }
 
 export const PERMANENTLY_DISABLED: readonly PermanentlyDisabledFeature[] = [
-  { id: "ai.assistant", label: "Assistant IA", state: "removed" },
-  { id: "ai.report_narrative", label: "Narratif de bulletin", state: "not_yet_available" },
-  { id: "ai.expense_anomaly", label: "Détection d'anomalies", state: "not_yet_available" },
-  { id: "workflows.dag_editor", label: "Éditeur de workflows (DAG)", state: "not_yet_available" },
-  { id: "data.excel_import", label: "Import Excel en masse", state: "not_yet_available" },
-  { id: "system.backup", label: "Sauvegarde locale", state: "not_yet_available" },
-  { id: "system.restore", label: "Restauration point-in-time", state: "not_yet_available" },
+  { id: "supabase.realtime", label: "Synchronisation temps réel Supabase", state: "not_yet_available" },
+  { id: "supabase.edge_functions", label: "Déploiement Edge Functions", state: "not_yet_available" },
+  { id: "supabase.rls", label: "Row-Level Security (RLS) policies", state: "not_yet_available" },
+  { id: "mobile.android_parity", label: "Parité mobile Android", state: "desktop_only" },
 ];

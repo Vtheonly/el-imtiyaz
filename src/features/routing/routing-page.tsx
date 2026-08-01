@@ -7,10 +7,10 @@
  */
 import { useTranslation } from "react-i18next";
 import { Route as RouteIcon, Lock } from "lucide-react";
-import { PageHeader } from "../../shared/components/page-header";
+import { PageHeader } from "../../shared/layout/page-header";
 import { Card, CardContent } from "../../shared/ui/card";
-import { ComingSoonCard } from "../../shared/components/coming-soon-card";
-import { useAccessState } from "../../shared/components/gated-content";
+import { ComingSoonCard } from "../../shared/layout/coming-soon-card";
+import { useAccessState } from "../../shared/layout/gated-content";
 import { Routing as RoutingNode } from "../../core/rbac/feature-registry";
 
 export function RoutingPage() {

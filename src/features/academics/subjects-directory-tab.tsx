@@ -12,19 +12,19 @@
  */
 import { useState } from "react";
 import { Plus, BookOpen, Edit2, Archive, Filter, Search } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { useToast } from "../../state/toast-context";
-import { useAuth } from "../../state/auth-context";
+import { useToast } from "../../app/providers/toast-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { Card, CardContent } from "../../shared/ui/card";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { Input } from "../../shared/ui/input";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
-import { ConfirmDialog } from "../../shared/components/confirm-dialog";
-import { UnifiedModal, type UnifiedModalProps } from "../../shared/components/unified-modal";
-import { FormField } from "../../shared/components/form-field";
-import { EmptyState } from "../../shared/components/state-views";
+import { ConfirmModal } from "../../shared/ui/unified-modal";
+import { UnifiedModal, type UnifiedModalProps } from "../../shared/ui/unified-modal";
+import { FormField } from "../../shared/ui/form-field";
+import { EmptyState } from "../../shared/layout/state-views";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../../shared/ui/select";
@@ -357,7 +357,7 @@ export function SubjectsDirectoryTab() {
       </UnifiedModal>
 
       {/* Archive confirmation */}
-      <ConfirmDialog
+      <ConfirmModal
         open={archiveSubject !== null}
         onOpenChange={(o) => !o && setArchiveSubject(null)}
         title={`Archiver: ${archiveSubject?.name ?? ""}`}

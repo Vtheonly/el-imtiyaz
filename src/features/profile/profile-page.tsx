@@ -7,21 +7,28 @@
  *   - Permission grid (chip per granted permission)
  *   - Recent activity (10 most-recent audit entries by current user)
  *
+ * Iteration 10 — added Password Governance card (plan §12.04):
+ *   - "Modifier mon mot de passe" button opens the ChangePasswordModal.
+ *   - Self-service password change with re-authentication + session revocation.
+ *   - Strength checklist (8+ chars, lowercase, uppercase, digit) per
+ *     plan §12.04 "Strong Entropy".
+ *
  * Uses UnifiedModal-style cards and the standard PageHeader so the
  * visual language matches every other page in the application.
  */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Shield, Clock, Mail, Building2, KeyRound } from "lucide-react";
-import { useAuth } from "../../state/auth-context";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { PageHeader } from "../../shared/components/page-header";
+import { ArrowLeft, Shield, Clock, Mail, Building2, KeyRound, Lock } from "lucide-react";
+import { useAuth } from "../../app/providers/auth-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { PageHeader } from "../../shared/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../shared/ui/card";
 import { Button } from "../../shared/ui/button";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
 import { Badge } from "../../shared/ui/badge";
-import { StatusChip } from "../../shared/components/status-chip";
-import { EmptyState } from "../../shared/components/state-views";
+import { StatusChip } from "../../shared/ui/status-chip";
+import { EmptyState } from "../../shared/layout/state-views";
+import { ChangePasswordModal } from "./change-password-modal";
 import { Permission, PERMISSION_LABELS_FR } from "../../core/rbac/permissions";
 import { ROLE_LABELS_FR } from "../../core/rbac/roles";
 import { formatDateTime } from "../../core/format/date";
@@ -34,6 +41,7 @@ export function ProfilePage() {
 
   const [recentActivity, setRecentActivity] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pwdOpen, setPwdOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -81,9 +89,14 @@ export function ProfilePage() {
         title="Mon profil"
         description="Vos informations de session, permissions et activité récente"
         actions={
-          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4" /> Retour
-          </Button>
+          <>
+            <Button variant="outline" size="sm" onClick={() => setPwdOpen(true)}>
+              <Lock className="h-4 w-4" /> Mot de passe
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4" /> Retour
+            </Button>
+          </>
         }
       />
 
@@ -125,6 +138,32 @@ export function ProfilePage() {
                 label={msUntilExpiry > 0 ? "Active" : "Expirée"}
                 tone={msUntilExpiry > 0 ? "success" : "danger"}
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Iteration 10 — Password Governance card (plan §12.04) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Lock className="h-4 w-4 text-status-warning" /> Sécurité du compte
+            </CardTitle>
+            <CardDescription>
+              Plan §12.04 — modification du mot de passe avec ré-authentification + révocation de session.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground">Mot de passe</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Modifiez votre mot de passe pour sécuriser votre compte. Toutes vos sessions actives
+                  seront révoquées après le changement.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setPwdOpen(true)}>
+                <KeyRound className="h-4 w-4" /> Modifier
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -199,6 +238,8 @@ export function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      <ChangePasswordModal open={pwdOpen} onOpenChange={setPwdOpen} />
     </div>
   );
 }

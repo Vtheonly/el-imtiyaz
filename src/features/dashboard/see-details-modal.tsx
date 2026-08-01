@@ -11,25 +11,39 @@
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, TrendingUp, Building2, Users, AlertCircle } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import type { RevenuePoint, DebtByAgingBucket } from "../../domain/model/operations";
 import { formatDzd, formatDzdPlain } from "../../core/format/currency";
-import { AGING_BUCKET_LABELS_FR } from "../../domain/model/payment";
-import { UnifiedModal } from "../../shared/components/unified-modal";
-import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/components/page-tabs";
+import { AGING_BUCKET_LABELS_FR, PAYMENT_CATEGORY_LABELS_FR, revenueByCategory } from "../../domain/model/payment";
+import { UnifiedModal } from "../../shared/ui/unified-modal";
+import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/layout/page-tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "../../shared/ui/card";
 
-export function SeeDetailsModal({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function SeeDetailsModal({
+  open,
+  onOpenChange,
+  initialTab = "revenue",
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  /** Iteration 9 — pre-select the tab the user clicked from in the dashboard. */
+  initialTab?: "revenue" | "departments" | "demographics" | "debt";
+}) {
   const { t } = useTranslation();
   const repos = useRepositories();
   const [revenue, setRevenue] = useState<RevenuePoint[]>([]);
   const [debtAging, setDebtAging] = useState<DebtByAgingBucket[]>([]);
-  const [demographics, setDemographics] = useState<{ grade: { label: string; count: number; percent: number }[]; gender: { label: string; count: number; percent: number }[] }>({ grade: [], gender: [] });
+  const [demographics, setDemographics] = useState<{
+    grade: { label: string; count: number; percent: number }[];
+    gender: { label: string; count: number; percent: number }[];
+    age: { label: string; count: number; percent: number }[];
+    capacity: { label: string; count: number; percent: number }[];
+  }>({ grade: [], gender: [], age: [], capacity: [] });
 
   useEffect(() => {
     if (!open) return;
@@ -57,12 +71,12 @@ export function SeeDetailsModal({ open, onOpenChange }: { open: boolean; onOpenC
       description="Vue détaillée des indicateurs — revenus, départements, démographie, créances."
       hideFooter
     >
-      <PageTabs defaultValue="revenue" variant="underline">
+      <PageTabs defaultValue={initialTab} variant="underline">
         <PageTabList>
-          <PageTab value="revenue" label={t("dashboard.sections.revenue")} />
-          <PageTab value="departments" label={t("dashboard.sections.departments")} />
-          <PageTab value="demographics" label={t("dashboard.sections.demographics")} />
-          <PageTab value="debt" label={t("dashboard.sections.debt")} />
+          <PageTab value="revenue" label={t("dashboard.sections.revenue")} icon={TrendingUp} />
+          <PageTab value="departments" label={t("dashboard.sections.departments")} icon={Building2} />
+          <PageTab value="demographics" label={t("dashboard.sections.demographics")} icon={Users} />
+          <PageTab value="debt" label={t("dashboard.sections.debt")} icon={AlertCircle} />
         </PageTabList>
 
         <PageTabContent value="revenue">
@@ -89,38 +103,100 @@ export function SeeDetailsModal({ open, onOpenChange }: { open: boolean; onOpenC
         </PageTabContent>
 
         <PageTabContent value="demographics">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Par niveau</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={demographics.grade} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70}>
+                          {demographics.grade.map((_, i) => (
+                            <Cell key={i} fill={["#349BD4", "#6EC1E4", "#C8A98C"][i % 3]} />
+                          ))}
+                        </Pie>
+                        <RTooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Par genre</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={demographics.gender} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70}>
+                          {demographics.gender.map((_, i) => (
+                            <Cell key={i} fill={["#349BD4", "#C8A98C"][i % 2]} />
+                          ))}
+                        </Pie>
+                        <RTooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Iteration 10 — Age distribution histogram (plan §15.03). */}
             <Card>
-              <CardHeader><CardTitle className="text-sm">Par niveau</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-sm">Distribution par âge</CardTitle>
+              </CardHeader>
               <CardContent>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={demographics.grade} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70}>
-                        {demographics.grade.map((_, i) => (
-                          <Cell key={i} fill={["#349BD4", "#6EC1E4", "#C8A98C"][i % 3]} />
-                        ))}
-                      </Pie>
-                      <RTooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                    </PieChart>
+                    <BarChart data={demographics.age}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <RTooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`${v} élèves`, "Effectif"]} />
+                      <Bar dataKey="count" fill="#6EC1E4" radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Iteration 10 — Capacity vs Enrollment gauge (plan §15.03). */}
             <Card>
-              <CardHeader><CardTitle className="text-sm">Par genre</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-sm">Capacité vs Inscriptions</CardTitle>
+              </CardHeader>
               <CardContent>
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={demographics.gender} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70}>
-                        {demographics.gender.map((_, i) => (
-                          <Cell key={i} fill={["#349BD4", "#C8A98C"][i % 2]} />
-                        ))}
-                      </Pie>
-                      <RTooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div className="space-y-3">
+                  {demographics.capacity.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Aucune donnée de capacité.</p>
+                  ) : (
+                    demographics.capacity.map((c) => {
+                      const fillPct = Math.min(100, c.percent);
+                      const tone = c.percent >= 100 ? "bg-status-danger" : c.percent >= 80 ? "bg-status-warning" : "bg-status-success";
+                      return (
+                        <div key={c.label} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">{c.label}</span>
+                            <span className="font-mono text-foreground">
+                              {c.count} inscrits · {c.percent}% capacité
+                            </span>
+                          </div>
+                          <div className="h-3 rounded-full bg-muted overflow-hidden relative">
+                            <div
+                              className={`h-full rounded-full transition-all ${tone}`}
+                              style={{ width: `${fillPct}%` }}
+                            />
+                            {c.percent >= 100 && (
+                              <span className="absolute end-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white">
+                                Surchargé
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -158,16 +234,42 @@ export function SeeDetailsModal({ open, onOpenChange }: { open: boolean; onOpenC
 }
 
 function DepartmentsTab() {
-  const departments = [
-    { label: "Scolarité (Tuition)", amount: 1_580_000, color: "#349BD4" },
-    { label: "Therapy (Orthophonie/Psychologie)", amount: 145_000, color: "#6EC1E4" },
-    { label: "Clubs (Échecs, Anglais, Sport)", amount: 92_000, color: "#C8A98C" },
-    { label: "Auxiliaire (Transport, Cantine)", amount: 268_000, color: "#3FA66E" },
-  ];
+  const repos = useRepositories();
+  const [departments, setDepartments] = useState<{ label: string; amount: number; color: string }[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      // Iteration 5: derive department revenue from the ledger via
+      // `revenueByCategory()` — no more hardcoded amounts.
+      const payments = repos.payments.observe().get();
+      const colors: Record<string, string> = {
+        tuition: "#349BD4",
+        transport: "#3FA66E",
+        canteen: "#C8A98C",
+        uniform: "#6EC1E4",
+        books: "#836C68",
+        extracurricular: "#C0504D",
+        other: "#3B464C",
+      };
+      const byCategory = revenueByCategory(payments);
+      const deps = byCategory.map((d) => ({
+        label: PAYMENT_CATEGORY_LABELS_FR[d.category] ?? d.category,
+        amount: d.amount,
+        color: colors[d.category] ?? "#3B464C",
+      }));
+      // If no data this month, show all categories with 0.
+      if (deps.length === 0) {
+        setDepartentsEmpty(setDepartments, colors, PAYMENT_CATEGORY_LABELS_FR);
+        return;
+      }
+      setDepartments(deps);
+    })();
+  }, [repos.payments]);
+
   const total = departments.reduce((s, d) => s + d.amount, 0);
   return (
     <Card>
-      <CardHeader><CardTitle className="text-sm">Revenu par département</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-sm">Revenu par département (mois en cours)</CardTitle></CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="h-[240px]">
@@ -191,7 +293,7 @@ function DepartmentsTab() {
                   <span className="font-mono text-foreground">{formatDzdPlain(d.amount)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full" style={{ width: `${(d.amount / total) * 100}%`, background: d.color }} />
+                  <div className="h-full" style={{ width: total === 0 ? "0%" : `${(d.amount / total) * 100}%`, background: d.color }} />
                 </div>
               </div>
             ))}
@@ -204,4 +306,16 @@ function DepartmentsTab() {
       </CardContent>
     </Card>
   );
+}
+
+function setDepartentsEmpty(
+  set: (deps: { label: string; amount: number; color: string }[]) => void,
+  colors: Record<string, string>,
+  labels: Record<string, string>,
+) {
+  set(["tuition", "transport", "canteen", "extracurricular"].map((cat) => ({
+    label: labels[cat] ?? cat,
+    amount: 0,
+    color: colors[cat] ?? "#3B464C",
+  })));
 }

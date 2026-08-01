@@ -15,9 +15,9 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save, CheckCheck, Loader2, Clock } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { useToast } from "../../state/toast-context";
-import { useAuth } from "../../state/auth-context";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { useToast } from "../../app/providers/toast-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import {
   ATTENDANCE_STATUS_LABELS_FR,
@@ -26,14 +26,14 @@ import {
   type AttendanceSession,
 } from "../../domain/model/academic";
 import { toIsoDay } from "../../core/format/date";
-import { PageHeader } from "../../shared/components/page-header";
+import { PageHeader } from "../../shared/layout/page-header";
 import { Card, CardContent } from "../../shared/ui/card";
 import { Button } from "../../shared/ui/button";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
 import { Input } from "../../shared/ui/input";
 import { Label } from "../../shared/ui/label";
 import { Badge } from "../../shared/ui/badge";
-import { StatusChip } from "../../shared/components/status-chip";
+import { StatusChip } from "../../shared/ui/status-chip";
 import { cn } from "../../shared/ui/cn";
 
 const STATUS_ORDER: AttendanceStatus[] = ["present", "absent_excused", "absent_unexcused", "late"];

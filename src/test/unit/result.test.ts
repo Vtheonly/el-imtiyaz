@@ -16,7 +16,7 @@ import {
   unwrapOr,
   type Result,
   type AppError,
-} from "../../core/result/result";
+} from "../../core/result";
 
 describe("Ok / Err constructors", () => {
   it("Ok produces a discriminated Ok result", () => {

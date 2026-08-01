@@ -6,21 +6,22 @@
  */
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ClipboardCheck, GraduationCap, BookOpen, Users, Calendar } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { useAuth } from "../../state/auth-context";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { LEVEL_LABELS_FR } from "../../domain/model/student";
-import { PageHeader } from "../../shared/components/page-header";
+import { PageHeader } from "../../shared/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../shared/ui/card";
-import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/components/page-tabs";
+import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/layout/page-tabs";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
-import { StatusChip } from "../../shared/components/status-chip";
+import { StatusChip } from "../../shared/ui/status-chip";
 import { Permission } from "../../core/rbac/permissions";
 import { ClassSubjectsTab } from "./class-subjects-tab";
 import { ClassAttendanceTab } from "./class-attendance-tab";
 import { ClassGradesTab } from "./class-grades-tab";
+import { NarrativeGeneratorButton } from "./narrative-generator-modal";
 
 export function ClassDetailPage() {
   const { classId } = useParams<{ classId: string }>();
@@ -72,7 +73,7 @@ export function ClassDetailPage() {
 
       <PageTabs defaultValue="students" className="flex-1 flex flex-col px-6 pb-6 min-h-0">
         <PageTabList>
-          <PageTab value="students" label="Élèves" icon={Users} />
+          <PageTab value="students" label="Élèves" icon={Users} count={students.length} />
           <PageTab value="subjects" label="Matières" icon={BookOpen} />
           <PageTab value="attendance" label="Présences" icon={Calendar} />
           <PageTab value="grades" label="Notes" icon={GraduationCap} />
@@ -105,6 +106,7 @@ export function ClassDetailPage() {
                         {s.medicalNotes && ` · ⚠ ${s.medicalNotes}`}
                       </p>
                     </div>
+                    <NarrativeGeneratorButton student={s} classId={classId!} />
                     <StatusChip
                       label={s.status === "active" ? "Actif" : s.status}
                       tone={s.status === "active" ? "success" : "neutral"}

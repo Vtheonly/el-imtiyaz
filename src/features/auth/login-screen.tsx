@@ -7,14 +7,15 @@
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LogIn, Shield, Wallet, GraduationCap, LifeBuoy } from "lucide-react";
-import { useAuth } from "../../state/auth-context";
-import { useToast } from "../../state/toast-context";
+import { LogIn, Shield, Wallet, GraduationCap, LifeBuoy, Users, ShoppingCart, Truck, Package, HardHat } from "lucide-react";
+import { useAuth } from "../../app/providers/auth-provider";
+import { useToast } from "../../app/providers/toast-provider";
 import { Button } from "../../shared/ui/button";
 import { Input } from "../../shared/ui/input";
 import { Label } from "../../shared/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../shared/ui/card";
 import { cn } from "../../shared/ui/cn";
+import { ParticleCanvas } from "../../shared/ui/particle-canvas";
 
 
 
@@ -25,6 +26,11 @@ const DEMO_ACCOUNTS = [
   { email: "financial@elimtiyaz.dz", password: "fin123", role: "Agent Financier", icon: Wallet, color: "text-status-success" },
   { email: "teacher@elimtiyaz.dz", password: "teach123", role: "Enseignant", icon: GraduationCap, color: "text-status-warning" },
   { email: "support@elimtiyaz.dz", password: "support123", role: "Personnel de Soutien", icon: LifeBuoy, color: "text-status-info" },
+  { email: "manager@elimtiyaz.dz", password: "manager123", role: "Responsable", icon: Users, color: "text-primary" },
+  { email: "buyer@elimtiyaz.dz", password: "buyer123", role: "Acheteur", icon: ShoppingCart, color: "text-status-info" },
+  { email: "driver@elimtiyaz.dz", password: "driver123", role: "Chauffeur", icon: Truck, color: "text-brand-brown" },
+  { email: "warehouse@elimtiyaz.dz", password: "warehouse123", role: "Magasinier", icon: Package, color: "text-status-success" },
+  { email: "worker@elimtiyaz.dz", password: "worker123", role: "Ouvrier", icon: HardHat, color: "text-brand-slate" },
 ];
 
 export function LoginScreen() {
@@ -63,8 +69,12 @@ export function LoginScreen() {
           </div>
 
           <div className="h-[50vh] -mx-4">
-            {/* Particle logo for visual identity */}
-            <ParticleLogoMini />
+            {/*
+              Brand side-panel decoration — uses the new ParticleCanvas
+              wrapper around the renderer-side ParticleEngine. Particles
+              form the EI monogram and react to the cursor.
+            */}
+            <ParticleCanvas mode="logo" density={3} fillRatio={0.7} />
           </div>
 
           <p className="text-xs text-muted-foreground">
@@ -143,10 +153,4 @@ export function LoginScreen() {
       </div>
     </div>
   );
-}
-
-/** Compact particle logo for the login side panel. */
-import { ParticleLogo } from "../../shared/components/particle-logo";
-function ParticleLogoMini() {
-  return <ParticleLogo mode="logo" text="EI" color="#349BD4" />;
 }

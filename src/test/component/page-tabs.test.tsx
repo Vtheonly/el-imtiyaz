@@ -20,7 +20,7 @@ import {
   PageTab,
   PageTabContent,
   PageTabsBar,
-} from "../../shared/components/page-tabs";
+} from "../../shared/layout/page-tabs";
 import {
   LayoutDashboard,
   AlertTriangle,

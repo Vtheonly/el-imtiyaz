@@ -18,6 +18,8 @@ const api = {
   app: {
     getVersion: () => ipcRenderer.invoke("app:get-version"),
     getPath: (name: string) => ipcRenderer.invoke("app:get-path", name),
+    restart: () => ipcRenderer.invoke("app:restart"),
+    isElectron: () => ipcRenderer.invoke("app:is-electron"),
   },
   fs: {
     showSaveDialog: (opts: unknown) => ipcRenderer.invoke("fs:save-dialog", opts),
@@ -27,6 +29,11 @@ const api = {
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke("shell:open-external", url),
     openPath: (path: string) => ipcRenderer.invoke("shell:open-path", path),
+  },
+  config: {
+    read: () => ipcRenderer.invoke("config:read"),
+    write: (config: Record<string, unknown>) => ipcRenderer.invoke("config:write", config),
+    delete: () => ipcRenderer.invoke("config:delete"),
   },
 } as const;
 

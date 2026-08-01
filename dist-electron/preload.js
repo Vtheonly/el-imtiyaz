@@ -17,6 +17,8 @@ const api = {
     app: {
         getVersion: () => ipcRenderer.invoke("app:get-version"),
         getPath: (name) => ipcRenderer.invoke("app:get-path", name),
+        restart: () => ipcRenderer.invoke("app:restart"),
+        isElectron: () => ipcRenderer.invoke("app:is-electron"),
     },
     fs: {
         showSaveDialog: (opts) => ipcRenderer.invoke("fs:save-dialog", opts),
@@ -25,6 +27,11 @@ const api = {
     shell: {
         openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
         openPath: (path) => ipcRenderer.invoke("shell:open-path", path),
+    },
+    config: {
+        read: () => ipcRenderer.invoke("config:read"),
+        write: (config) => ipcRenderer.invoke("config:write", config),
+        delete: () => ipcRenderer.invoke("config:delete"),
     },
 };
 contextBridge.exposeInMainWorld("elImtiyaz", api);

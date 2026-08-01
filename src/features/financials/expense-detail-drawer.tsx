@@ -27,17 +27,17 @@ import {
   Upload,
   Receipt,
 } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { useToast } from "../../state/toast-context";
-import { useAuth } from "../../state/auth-context";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { useToast } from "../../app/providers/toast-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { UnifiedModal } from "../../shared/components/unified-modal";
+import { UnifiedModal } from "../../shared/ui/unified-modal";
 import { Button } from "../../shared/ui/button";
-import { StatusChip } from "../../shared/components/status-chip";
+import { StatusChip } from "../../shared/ui/status-chip";
 import { Separator } from "../../shared/ui/separator";
 import { Textarea } from "../../shared/ui/textarea";
-import { FormField } from "../../shared/components/form-field";
-import { ConfirmDialog } from "../../shared/components/confirm-dialog";
+import { FormField } from "../../shared/ui/form-field";
+import { ConfirmModal } from "../../shared/ui/unified-modal";
 import { formatDzd } from "../../core/format/currency";
 import { formatRelative, formatDateTime } from "../../core/format/date";
 import {
@@ -47,6 +47,7 @@ import {
   type ExpenseStatus,
 } from "../../domain/model/expense";
 import { Permission } from "../../core/rbac/permissions";
+import { AnomalyExplainerModal } from "./anomaly-explainer-modal";
 
 const STAGE_ORDER: ExpenseStatus[] = ["submitted", "approved", "disbursed", "settled"];
 
@@ -73,6 +74,7 @@ export function ExpenseDetailDrawer({
   const [proofDialogOpen, setProofDialogOpen] = useState(false);
   const [proofFileName, setProofFileName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [anomalyOpen, setAnomalyOpen] = useState(false);
 
   if (!open || !expenseId || !expense) return null;
 
@@ -200,18 +202,23 @@ export function ExpenseDetailDrawer({
         }
       >
         <div className="space-y-5">
-          {/* Anomaly banner */}
+          {/* Anomaly banner — clickable to open the AnomalyExplainerModal (plan §11.07) */}
           {hasAnomaly && (
-            <div className="rounded-md border border-status-danger/40 bg-status-danger/10 p-3 flex items-start gap-2">
+            <button
+              type="button"
+              onClick={() => setAnomalyOpen(true)}
+              className="w-full text-left rounded-md border border-status-danger/40 bg-status-danger/10 p-3 flex items-start gap-2 transition-colors hover:bg-status-danger/15 cursor-pointer"
+              title="Cliquer pour voir l'explication de l'anomalie"
+            >
               <AlertTriangle className="h-4 w-4 text-status-danger shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-status-danger">Anomalie détectée</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-status-danger">Anomalie détectée — cliquer pour l'explication</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{expense.anomalyNote}</p>
                 <p className="text-[10px] text-muted-foreground mt-1 italic">
                   Signal — l'humain décide toujours (plan §11).
                 </p>
               </div>
-            </div>
+            </button>
           )}
 
           {/* Header card */}
@@ -378,8 +385,8 @@ export function ExpenseDetailDrawer({
         </FormField>
       </UnifiedModal>
 
-      {/* Disburse confirm — ConfirmDialog (wraps UnifiedModal) */}
-      <ConfirmDialog
+      {/* Disburse confirm — ConfirmModal (built on UnifiedModal) */}
+      <ConfirmModal
         open={disburseDialogOpen}
         onOpenChange={setDisburseDialogOpen}
         title="Décaisser les fonds ?"
@@ -422,6 +429,13 @@ export function ExpenseDetailDrawer({
           </label>
         </FormField>
       </UnifiedModal>
+
+      {/* Anomaly explainer modal — opens when the anomaly banner is clicked */}
+      <AnomalyExplainerModal
+        expenseId={expenseId}
+        open={anomalyOpen}
+        onOpenChange={setAnomalyOpen}
+      />
     </>
   );
 }

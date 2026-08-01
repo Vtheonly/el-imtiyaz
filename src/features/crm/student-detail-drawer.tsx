@@ -14,20 +14,22 @@
  */
 import { useState } from "react";
 import {
-  GraduationCap, Calendar, Wallet, Info, Phone, ArrowRight,
+  GraduationCap, Calendar, Wallet, Info, Phone, ArrowRight, Download, FileText,
 } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
+import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { UnifiedModal } from "../../shared/components/unified-modal";
-import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/components/page-tabs";
+import { useToast } from "../../app/providers/toast-provider";
+import { UnifiedModal } from "../../shared/ui/unified-modal";
+import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/layout/page-tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../shared/ui/card";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
 import { Separator } from "../../shared/ui/separator";
-import { StatusChip } from "../../shared/components/status-chip";
+import { StatusChip } from "../../shared/ui/status-chip";
 import { formatDzd, formatDzdPlain } from "../../core/format/currency";
 import { formatDate, formatRelative } from "../../core/format/date";
+import { generateBulletinPdf, downloadPdf } from "../../infrastructure/receipt-pdf";
 import {
   LEVEL_LABELS_FR,
   STUDENT_STATUS_LABELS_FR,
@@ -257,7 +259,9 @@ function InfoTab({
 /* ============================================================ */
 function AcademicTab({ studentId }: { studentId: string }) {
   const repos = useRepositories();
+  const toast = useToast();
   const [term, setTerm] = useState<AcademicTerm>("T1");
+  const [downloading, setDownloading] = useState(false);
   const assessments = useObservable(() => repos.grades.observeForStudent(studentId), [studentId]);
 
   // Academic history is append-only and lives on the student entity itself
@@ -275,24 +279,85 @@ function AcademicTab({ studentId }: { studentId: string }) {
   );
   const gpa = totalCoef > 0 ? weightedSum / totalCoef : null;
 
+  /**
+   * Iteration 9 — Bulletin PDF download (spec §5.2).
+   *
+   * Per spec: "Student Report Cards / Grade Transcripts (Bulletins
+   * trimestriels / Relevé de notes): Must be generated exclusively inside
+   * the Student Profile Drawer (StudentDetailDrawer) or Class Detail view."
+   *
+   * The button generates a PDF containing the student's identity, term
+   * grades, GPA, and academic history. Generated entirely client-side
+   * via pdf-lib.
+   */
+  async function handleDownloadBulletin() {
+    if (!student) {
+      toast.showWarning("Élève introuvable", "Impossible de générer le bulletin.");
+      return;
+    }
+    if (termAssessments.length === 0) {
+      toast.showWarning("Aucune note", `Aucune note saisie pour ${term}.`);
+      return;
+    }
+    setDownloading(true);
+    try {
+      const klass = student.classId
+        ? repos.classes.observe().get().find((c) => c.id === student.classId)
+        : null;
+      const pdfBytes = await generateBulletinPdf({
+        student,
+        term,
+        assessments: termAssessments,
+        gpa,
+        subjects: repos.subjects.observe().get(),
+        className: klass?.name,
+      });
+      const fileName = `bulletin-${student.code}-${term}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      downloadPdf(pdfBytes, fileName);
+      toast.showSuccess("Bulletin téléchargé", fileName);
+    } catch (e) {
+      toast.showError("Échec du téléchargement", e instanceof Error ? e.message : String(e));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="text-sm flex items-center justify-between">
             <span>Notes — {term}</span>
-            <div className="flex gap-1">
-              {TERMS.map((t) => (
-                <Button
-                  key={t}
-                  size="sm"
-                  variant={t === term ? "default" : "outline"}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setTerm(t)}
-                >
-                  {t}
-                </Button>
-              ))}
+            <div className="flex items-center gap-2">
+              {/* Iteration 9 — Bulletin PDF (spec §5.2: entity-specific report
+                  generated exclusively inside the StudentDetailDrawer). */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                onClick={handleDownloadBulletin}
+                disabled={downloading || termAssessments.length === 0}
+                title="Télécharger le bulletin PDF"
+              >
+                {downloading ? (
+                  <><FileText className="h-3 w-3" /> Génération…</>
+                ) : (
+                  <><Download className="h-3 w-3" /> Bulletin PDF</>
+                )}
+              </Button>
+              <div className="flex gap-1">
+                {TERMS.map((t) => (
+                  <Button
+                    key={t}
+                    size="sm"
+                    variant={t === term ? "default" : "outline"}
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setTerm(t)}
+                  >
+                    {t}
+                  </Button>
+                ))}
+              </div>
             </div>
           </CardTitle>
           <CardDescription>

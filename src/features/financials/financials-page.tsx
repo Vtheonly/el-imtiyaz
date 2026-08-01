@@ -9,11 +9,11 @@
  *   - Expense detail drawer with full workflow (Approve/Reject/Disburse/Settle)
  *   - Installment Schedule tab (replaces ComingSoonCard) with one-click collect
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Download, Filter, Search, Wallet, TrendingUp, AlertTriangle, Receipt, FileText, CreditCard, CalendarClock, AlertCircle, Send, FileCheck } from "lucide-react";
-import { useRepositories } from "../../infrastructure/repository-provider";
-import { useAuth } from "../../state/auth-context";
+import { useRepositories } from "../../app/providers/repository-provider";
+import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { formatDzd } from "../../core/format/currency";
 import { formatRelative } from "../../core/format/date";
@@ -22,15 +22,17 @@ import {
   PAYMENT_STATUS_LABELS_FR,
   PAYMENT_CATEGORY_LABELS_FR,
   AGING_BUCKET_LABELS_FR,
+  sumPaidPayments,
+  monthlyRevenue,
 } from "../../domain/model/payment";
 import { EXPENSE_STATUS_LABELS_FR, EXPENSE_CATEGORY_LABELS_FR } from "../../domain/model/expense";
 import { Permission } from "../../core/rbac/permissions";
-import { PageHeader } from "../../shared/components/page-header";
-import { KpiCard } from "../../shared/components/kpi-card";
-import { StatusChip } from "../../shared/components/status-chip";
-import { ComingSoonCard } from "../../shared/components/coming-soon-card";
+import { PageHeader } from "../../shared/layout/page-header";
+import { KpiCard } from "../../shared/ui/kpi-card";
+import { StatusChip } from "../../shared/ui/status-chip";
+import { ComingSoonCard } from "../../shared/layout/coming-soon-card";
 import { Card, CardContent } from "../../shared/ui/card";
-import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/components/page-tabs";
+import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/layout/page-tabs";
 import { Button } from "../../shared/ui/button";
 import { Input } from "../../shared/ui/input";
 import { CounterPaymentModal } from "./counter-payment-modal";
@@ -52,9 +54,12 @@ export function FinancialsPage() {
   const [expenseDetailId, setExpenseDetailId] = useState<string | null>(null);
   const [expenseDetailOpen, setExpenseDetailOpen] = useState(false);
 
-  const totalToday = payments.filter((p) => p.status === "paid").reduce((s, p) => s + p.amount, 0);
+  // Iteration 5: use shared helpers — no duplicated logic.
+  const totalToday = sumPaidPayments(payments);
   const pendingExpenses = expenses.filter((e) => e.status === "submitted").length;
   const overdueDebt = debtSummary.reduce((s, d) => s + d.outstandingAmount, 0);
+  // Monthly revenue = sum of paid payments collected this month.
+  const monthlyRev = monthlyRevenue(payments);
 
   const canCollect = !!session && session.permissions.has(Permission.CollectPayment);
   const canSubmitExpense = !!session && session.permissions.has(Permission.SubmitExpense);
@@ -89,7 +94,7 @@ export function FinancialsPage() {
       <div className="px-6 pb-3">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard label="Encaissé (cumul)" value={formatDzd(totalToday, { compact: true })} icon={<Wallet className="h-5 w-5" />} tone="success" />
-          <KpiCard label="Revenu mensuel" value={formatDzd(285_000, { compact: true })} icon={<TrendingUp className="h-5 w-5" />} tone="info" />
+          <KpiCard label="Revenu mensuel" value={formatDzd(monthlyRev, { compact: true })} icon={<TrendingUp className="h-5 w-5" />} tone="info" />
           <KpiCard label="Créances en retard" value={formatDzd(overdueDebt, { compact: true })} icon={<AlertTriangle className="h-5 w-5" />} tone="danger" />
           <KpiCard label="Dépenses en attente" value={pendingExpenses} icon={<Receipt className="h-5 w-5" />} tone="warning" />
         </div>
@@ -180,6 +185,7 @@ function PaymentsTab() {
 function DebtTab() {
   const repos = useRepositories();
   const debt = useObservable(() => repos.debt.observeSummary(), []);
+  const students = useObservable(() => repos.students.observe(), []);
   const [reminding, setReminding] = useState<string | null>(null);
 
   async function sendReminder(parentId: string, name: string) {
@@ -199,36 +205,129 @@ function DebtTab() {
     }
   }
 
+  // Iteration 10 — Top 20 Family Debtors ranking (plan §07.06).
+  // Sort by outstanding amount desc, take top 20.
+  const top20Debtors = [...debt]
+    .filter((d) => d.outstandingAmount > 0)
+    .sort((a, b) => b.outstandingAmount - a.outstandingAmount)
+    .slice(0, 20);
+
+  // Iteration 10 — Per-Grade breakdown (plan §07.06).
+  // For each debtor, look up their students' grade levels and attribute the
+  // outstanding amount proportionally across those grades.
+  const perGradeBreakdown = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const d of debt) {
+      if (d.outstandingAmount <= 0) continue;
+      const familyStudents = students.filter((s) => s.parentId === d.parentId);
+      if (familyStudents.length === 0) {
+        // Attribute to "Inconnu" if we can't resolve any student.
+        totals.set("Inconnu", (totals.get("Inconnu") ?? 0) + d.outstandingAmount);
+        continue;
+      }
+      const sharePerStudent = d.outstandingAmount / familyStudents.length;
+      for (const s of familyStudents) {
+        const gradeKey = `${s.level} — A${s.gradeYear}`;
+        totals.set(gradeKey, (totals.get(gradeKey) ?? 0) + sharePerStudent);
+      }
+    }
+    return Array.from(totals.entries())
+      .map(([grade, amount]) => ({ grade, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [debt, students]);
+
+  const maxGradeAmount = perGradeBreakdown.length > 0 ? perGradeBreakdown[0].amount : 1;
+
   return (
-    <Card>
-      <CardContent className="p-0">
-        <ul className="divide-y divide-border">
-          {debt.filter((d) => d.outstandingAmount > 0).map((d) => (
-            <li key={d.parentId} className="flex items-center gap-3 p-3 hover:bg-accent/5">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{d.parentName}</p>
-                <p className="text-xs text-muted-foreground font-mono">{d.parentPhone}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <StatusChip label={AGING_BUCKET_LABELS_FR[d.bucket]} tone={d.bucket === "0_30" ? "success" : d.bucket === "31_60" ? "warning" : "danger"} />
-                <p className="text-xs text-muted-foreground">{d.daysOverdue} jours</p>
-              </div>
-              <p className="text-sm font-semibold tnum text-status-danger min-w-[120px] text-right">
-                {formatDzd(d.outstandingAmount)}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={reminding === d.parentId}
-                onClick={() => sendReminder(d.parentId, d.parentName)}
-              >
-                {reminding === d.parentId ? "…" : "Rappel"}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      {/* Iteration 10 — Top 20 Family Debtors ranking (plan §07.06) */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="border-b border-border p-3">
+            <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-status-danger" />
+              Top 20 débiteurs familiaux
+              <span className="text-[10px] text-muted-foreground font-normal">
+                (plan §07.06 — priorisation du recouvrement)
+              </span>
+            </h3>
+          </div>
+          <ul className="divide-y divide-border">
+            {top20Debtors.length === 0 ? (
+              <li className="p-6 text-center text-sm text-muted-foreground">
+                Aucune créance en cours. 🎉
+              </li>
+            ) : (
+              top20Debtors.map((d, idx) => (
+                <li key={d.parentId} className="flex items-center gap-3 p-3 hover:bg-accent/5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-status-danger/10 text-xs font-mono font-semibold text-status-danger">
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{d.parentName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{d.parentPhone}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusChip
+                      label={AGING_BUCKET_LABELS_FR[d.bucket]}
+                      tone={d.bucket === "0_30" ? "success" : d.bucket === "31_60" ? "warning" : "danger"}
+                    />
+                    <p className="text-xs text-muted-foreground">{d.daysOverdue} j</p>
+                  </div>
+                  <p className="text-sm font-semibold tnum text-status-danger min-w-[120px] text-right">
+                    {formatDzd(d.outstandingAmount)}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={reminding === d.parentId}
+                    onClick={() => sendReminder(d.parentId, d.parentName)}
+                  >
+                    {reminding === d.parentId ? "…" : "Rappel"}
+                  </Button>
+                </li>
+              ))
+            )}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Iteration 10 — Per-Grade breakdown (plan §07.06) */}
+      {perGradeBreakdown.length > 0 && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="border-b border-border p-3">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Répartition par niveau scolaire
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  (part proportionnelle par élève de la famille)
+                </span>
+              </h3>
+            </div>
+            <div className="p-3 space-y-2">
+              {perGradeBreakdown.map((g) => {
+                const pct = maxGradeAmount > 0 ? (g.amount / maxGradeAmount) * 100 : 0;
+                return (
+                  <div key={g.grade} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{g.grade}</span>
+                      <span className="font-mono text-foreground">{formatDzd(g.amount)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-status-danger/70 transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
