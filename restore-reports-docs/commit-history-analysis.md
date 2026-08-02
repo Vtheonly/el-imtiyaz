@@ -196,7 +196,7 @@ src/                                   src/                                src/
 
 ---
 
-### Commit 11 — `2fdf7c0` — `aight` ⚠️ **ARCHITECTURAL PIVOT**
+### Commit 11 — `2fdf7c0` — `aight`  **ARCHITECTURAL PIVOT**
 | Field | Value |
 |---|---|
 | Date | 2026-07-27 |
@@ -231,7 +231,7 @@ src/                                   src/                                src/
 
 ---
 
-### Commit 13 — `3aec205` — `fix: resolve merge conflict in README` ⚠️ **MERGE COMMIT**
+### Commit 13 — `3aec205` — `fix: resolve merge conflict in README`  **MERGE COMMIT**
 | Field | Value |
 |---|---|
 | Date | 2026-07-27 |
@@ -243,7 +243,7 @@ src/                                   src/                                src/
 
 ---
 
-### Commit 14 — `1356665` — `okay nice` ⚠️ **ITERATION 3**
+### Commit 14 — `1356665` — `okay nice`  **ITERATION 3**
 | Field | Value |
 |---|---|
 | Date | 2026-07-27 |
@@ -257,7 +257,7 @@ src/                                   src/                                src/
 
 ---
 
-### Commit 15 — `7123f7d` — `not working at all` ⚠️ **THE SIGNAL COMMIT**
+### Commit 15 — `7123f7d` — `not working at all`  **THE SIGNAL COMMIT**
 | Field | Value |
 |---|---|
 | Date | 2026-07-27 |
@@ -273,7 +273,7 @@ src/                                   src/                                src/
 
 ---
 
-### Commit 16 — `22882fb` — `mid` ⚠️ **ITERATION 4**
+### Commit 16 — `22882fb` — `mid`  **ITERATION 4**
 | Field | Value |
 |---|---|
 | Date | 2026-08-01 (5-day gap from previous) |
@@ -287,7 +287,7 @@ src/                                   src/                                src/
 
 ---
 
-### Commit 17 — `29e794c` — `good enough` ⚠️⚠️ **THE MEGA-COMMIT + TEST-FAILURE INTRODUCTION**
+### Commit 17 — `29e794c` — `good enough`  **THE MEGA-COMMIT + TEST-FAILURE INTRODUCTION**
 | Field | Value |
 |---|---|
 | Date | 2026-08-01 (6 minutes after `22882fb`) |
@@ -299,7 +299,7 @@ src/                                   src/                                src/
 
 **Impact:** Improved (features) / **Degraded (introduces 24 permanently-failing tests).**
 
-**Regressions:** ⚠️ **Introduces all 24 of the "pre-existing" Excel test failures.** The 4 failing test files are all traceable to this commit:
+**Regressions:**  **Introduces all 24 of the "pre-existing" Excel test failures.** The 4 failing test files are all traceable to this commit:
 - `schemas.test.ts` expects `BON_SCHEMA.headerRow === 10` and `DEVIS_SCHEMA.headerRow === 13`, but schemas have `headerRow: 1`. **These tests have never passed.**
 - `engine.test.ts` has 2 failing tests (audit events + invalid-row rejection).
 - `excel-import-comprehensive.test.ts` has 7 failing tests (0 rows imported).
@@ -319,13 +319,13 @@ src/                                   src/                                src/
 | Files | 32 changed, +247/−247 |
 | Era | 2 |
 
-**What changed:** 247 insertions and 247 deletions — classic **CRLF↔LF line-ending normalization** + emoji stripping.
+**What changed:** 247 insertions and 247 deletions — classic **CRLFLF line-ending normalization** + emoji stripping.
 
 **Note:** The orphan commit `d8eb5a6 "cv"` has the same parent and produces identical tree as `16cdd25` — `git diff d8eb5a6 16cdd25` is empty. It appears the author committed the same change twice.
 
 ---
 
-### Commit 19 — `db037fa` — `refactor(calc): centralize math engine into src/domain/calc/ (iter 1)` ✅ **REFACTOR BOT, ITER 1**
+### Commit 19 — `db037fa` — `refactor(calc): centralize math engine into src/domain/calc/ (iter 1)`  **REFACTOR BOT, ITER 1**
 | Field | Value |
 |---|---|
 | Date | 2026-08-01 |
@@ -341,7 +341,7 @@ src/                                   src/                                src/
 
 ---
 
-### Commit 20 — `88b42fb` — `refactor(mock): split 5100-LOC mock layer into per-entity modules (iter 2)` ✅ **REFACTOR BOT, ITER 2 (HEAD)**
+### Commit 20 — `88b42fb` — `refactor(mock): split 5100-LOC mock layer into per-entity modules (iter 2)`  **REFACTOR BOT, ITER 2 (HEAD)**
 | Field | Value |
 |---|---|
 | Date | 2026-08-01 |

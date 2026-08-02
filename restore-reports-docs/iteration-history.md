@@ -75,7 +75,7 @@ Complete every remaining item from the iteration-3 roadmap AND add a Unified Mod
 - **UnifiedModal primitive** — `dialog` (centered overlay) and `drawer` (right-side slide-over) variants sharing identical skeleton. Shared header/body/footer, loading/error/success states, animations, close behavior. Convenience exports: `ConfirmModal`, `UnifiedModalHeader/Body/Footer`, `UnifiedModalAlert`.
 - **Refactored 5 existing modals** onto UnifiedModal.
 - **PageTabs primitive** — three variants: `elevated` (segmented control), `underline` (dense layouts), `rail` (vertical for settings). Refactored 7 pages onto PageTabs.
-- **A. CRM Student Detail Drawer** — 4-tab slide-over (Infos/Académique/Présences/Paiements). Bidirectional navigation (student ↔ parent drawer).
+- **A. CRM Student Detail Drawer** — 4-tab slide-over (Infos/Académique/Présences/Paiements). Bidirectional navigation (student  parent drawer).
 - **B. Receipt PDF generation** — `generatePaymentReceiptPdf()` + `generateAccountStatementPdf()` using `pdf-lib`. Receipts-tab replaces ComingSoonCard.
 - **C. Excel bulk import pipeline** — `parseAndPreview()` + `commitImport()` using ExcelJS. 5-step pipeline (select → parse → map headers → validate → atomic bulk insert).
 - **D. Report export engine** — `exportToXlsx()` (multi-sheet) + `exportToCsv()`. Three report types: Revenue, Outstanding Debt, Student Roster.

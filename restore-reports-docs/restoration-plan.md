@@ -177,18 +177,18 @@ After each phase:
 
 The restoration is complete when:
 
-1. ✅ All 1,444 tests pass (0 failures).
-2. ✅ `tsc --noEmit` is clean.
-3. ✅ Production build succeeds.
-4. ✅ No file exceeds 400 LOC.
-5. ✅ No build artifacts in git.
-6. ✅ All 39 repositories have Supabase adapters.
-7. ✅ Real AI API calls work.
-8. ✅ Real backups work with offsite vault.
-9. ✅ Playwright E2E tests pass.
-10. ✅ CI runs on every commit and blocks merges on failure.
-11. ✅ All commits use conventional-commit format.
-12. ✅ `restore-reports-docs/` is up to date.
+1.  All 1,444 tests pass (0 failures).
+2.  `tsc --noEmit` is clean.
+3.  Production build succeeds.
+4.  No file exceeds 400 LOC.
+5.  No build artifacts in git.
+6.  All 39 repositories have Supabase adapters.
+7.  Real AI API calls work.
+8.  Real backups work with offsite vault.
+9.  Playwright E2E tests pass.
+10.  CI runs on every commit and blocks merges on failure.
+11.  All commits use conventional-commit format.
+12.  `restore-reports-docs/` is up to date.
 
 **Current status:** 7 of 12 criteria met (1, 2, 3, partial 4, 9, 10, 11). Remaining work: 4 (large files), 5 (build artifacts), 6 (Supabase adapters), 7 (AI), 8 (backups), 12 (docs — done with this iteration).
 

@@ -174,6 +174,13 @@ export class InMemoryAdapter extends StorageAdapter {
     return this.runs.get(runId) ?? null;
   }
 
+  /** Return every record inserted during the given run — used by the sync queue. */
+  async listInsertedForRun(runId: string): Promise<StorageRecord[]> {
+    return Array.from(this.records.values()).filter(
+      (r) => r.firstImportedRunId === runId || r.lastUpdatedRunId === runId,
+    );
+  }
+
   async close(): Promise<void> {
     // No-op — let GC reclaim the maps.
   }

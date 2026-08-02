@@ -76,6 +76,12 @@ export abstract class StorageAdapter {
   /** Get a single run by ID. */
   abstract getRun(runId: string): Promise<RunAuditEntry | null>;
 
+  /** Return every record inserted during the given run — used by the sync queue.
+   *  Optional: default implementation returns an empty array. */
+  async listInsertedForRun(_runId: string): Promise<StorageRecord[]> {
+    return [];
+  }
+
   /** Close any open resources. */
   abstract close(): Promise<void>;
 }

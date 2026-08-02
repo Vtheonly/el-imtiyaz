@@ -22,16 +22,16 @@
 
 ## Completed Modules
 
-### Core Architecture ✅
+### Core Architecture 
 - **Layered architecture** — `core/` (pure utils), `domain/` (business logic + calc engine), `infrastructure/` (adapters), `features/` (UI modules), `shared/` (UI primitives), `app/` (shell + providers).
 - **Pure domain layer** — no I/O, no React, fully testable. Repository contracts return `Promise<Result<T>>` for fallible ops and `Observable<T>` for reactive reads.
 - **Centralized math engine** (`src/domain/calc/` — 1,974 LOC across 16 modules) — single source of truth for all calculations. Refactor iter 1.
 - **Split mock layer** (`src/infrastructure/mock/repositories/` — 14 per-entity files) — was 3,206-LOC monolith. Refactor iter 2.
 
-### Domain Models ✅
+### Domain Models 
 - Parent, Student (14 grade levels, 3 academic levels), Academic (Class/Subject/ClassSubject/Assessment/Attendance/Homework), Payment (3 methods, 6 statuses, installments, adjustments), Expense (6 statuses, 9 categories, anomaly scoring), Personnel (11 roles, Releve), Operations (Supplier/PurchaseRequest/Delivery/Inventory), Workflow (DAG with 5 node types, 17 subtypes), Audit (append-only), Calendar, Notifications, Backup, AI Config.
 
-### Financial System ✅
+### Financial System 
 - **Ledger-based accounting** — every financial value computed by replaying immutable ledger entries. Balances never stored as isolated numbers.
 - **Reconciliation engine** — 7 structural checks + 3 cross-entity checks. Detects duplicate IDs, orphan reversals, balance sum mismatches, signed-amount convention violations.
 - **Payment workflow** — collect (cash → paid, check/transfer → pending), refund (with ledger reversal), adjust (account adjustments replace deprecated scholarships).
@@ -39,7 +39,7 @@
 - **Expense workflow** — submit → approve → disburse → settle. No-self-approval enforced at UI + repository + DB layers. State machine validation. Anomaly detection (signal not verdict).
 - **Official 2026-2027 pricing** — 14 grade levels, 4 transport destinations, 5 canonical discounts, complementary services, 2nd apron surcharge. All configurable via UI.
 
-### UI / UX ✅
+### UI / UX 
 - **100% Unified Modal System** — zero raw `@radix-ui/react-dialog` imports in production code (enforced by regression test). Three variants: dialog, drawer, command-palette.
 - **Unified tab navigation** — `<PageTabs>` with elevated/underline/rail variants. Sliding ink-bar + sliding pill indicators. All Hub pages use consistent `variant="elevated"`.
 - **11 role-based dashboards** — SuperAdmin, FinancialOfficer, Teacher, SupportStaff, Manager, Buyer, Driver, WarehouseWorker, Worker, Parent, Student.
@@ -47,7 +47,7 @@
 - **Internationalization** — FR primary + AR secondary (RTL). `initLocale()` prevents LTR flash for Arabic users.
 - **User preferences** — theme (dark/light), locale, timezone, currency. Consolidated in `UserPreferencesProvider`. Persists to localStorage.
 
-### Feature Hubs ✅
+### Feature Hubs 
 - **Auth** — Splash screen with particle animation, login with 9 demo accounts.
 - **Dashboard** — KPIs (students, parents, staff, monthly revenue, outstanding debt, attendance rate, overdue alerts), 12-month revenue chart, debt aging buckets, demographics (4 slices: grade, gender, age, capacity), integrated calendar, alerts feed, academic year selector with date range filtering.
 - **CRM** — Parents list, students list, batch registration (atomic with rollback), parent detail drawer (4 sections), student detail drawer (4 tabs), Excel import (schema-driven, 4 sheet types).
@@ -58,7 +58,7 @@
 - **Settings** — 10 tabs (Général, Tarification, Journal d'audit, Matrice RBAC, Inscriptions, Configuration, Synchronisation, IA, Sauvegardes, Fonctionnalités verrouillées).
 - **Profile** — Header card, permissions grid, recent activity, change password (with strength validation + session revocation).
 
-### Infrastructure ✅
+### Infrastructure 
 - **Mock repository layer** — 39 singletons (25 core + 9 workforce + 5 operations) across 14 per-entity files. Shared `MockStore` with 20 reactive collections.
 - **Supabase adapter (partial)** — Auth + Approval repositories fully ported. 24 SQL migrations, 11 Edge Functions, 60+ RLS policies ALL production-ready. Other 38 repos fall back to mock.
 - **Sync service** — Offline-first queue with IndexedDB persistence. Mock exclusion (defense in depth). Auto-sync triggers. Exponential backoff retry.
@@ -68,7 +68,7 @@
 - **PDF generation** — Receipts, account statements, report cards (bulletins), payslips.
 - **Particle engine** — GPU-free particle animation with morphing (logo/circular/linear modes). Replaced native `sharp` dependency with Web APIs.
 
-### Testing ✅
+### Testing 
 - **1,444 tests** across 66 files (1,420 passing, 24 pre-existing Excel failures).
 - **Test trajectory:** 0 → 158 → 273 → 330 → 393 → 527 → 723 → 807 → 836 → 980 → 1004 → 1015 → 1027 → 1107 → 1149 → 1180 → 1444. Zero regressions across all refactors.
 - **Coverage areas:** unit (calc, excel, mock, workforce, domain), component (modals, dashboards, tabs), integration (repositories, ledger, workflows).

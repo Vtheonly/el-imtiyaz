@@ -127,24 +127,24 @@ describe("Iteration 15 — Settings redesign regression guards", () => {
   });
 
   it("ConfigurationTab uses shared Switch primitive (not hand-rolled toggle)", () => {
-    const file = join(SRC_ROOT, "features", "settings", "configuration-tab.tsx");
+    const file = join(SRC_ROOT, "features", "settings", "configuration", "setting-row.tsx");
     const content = readFileSync(file, "utf8");
-    expect(content).toMatch(/from\s+["]\.\.\/\.\.\/shared\/ui\/switch["]/);
+    expect(content).toMatch(/from\s+["]\.\.\/\.\.\/\.\.\/shared\/ui\/switch["]/);
     // The old hand-rolled pattern:
     expect(content).not.toMatch(/<button[^>]*role="switch"/);
   });
 
   it("ConfigurationTab uses shared Select primitive (not raw <select>)", () => {
-    const file = join(SRC_ROOT, "features", "settings", "configuration-tab.tsx");
+    const file = join(SRC_ROOT, "features", "settings", "configuration", "setting-row.tsx");
     const content = readFileSync(file, "utf8");
-    expect(content).toMatch(/from\s+["]\.\.\/\.\.\/shared\/ui\/select["]/);
+    expect(content).toMatch(/from\s+["]\.\.\/\.\.\/\.\.\/shared\/ui\/select["]/);
     // Raw <select should not appear (the JSX would be <select>).
     // We allow it in comments / strings, so check for the JSX form specifically.
     expect(content).not.toMatch(/<select[\s>]/);
   });
 
   it("ConfigurationTab uses StatusChip for status badges (not raw Tailwind bg-green-500)", () => {
-    const file = join(SRC_ROOT, "features", "settings", "configuration-tab.tsx");
+    const file = join(SRC_ROOT, "features", "settings", "configuration", "setting-row.tsx");
     const content = readFileSync(file, "utf8");
     expect(content).toMatch(/StatusChip/);
     // The old hardcoded color pattern:

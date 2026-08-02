@@ -2,7 +2,7 @@
 
 > Educational & Operational Management Platform — Desktop Terminal (Electron + React + TypeScript)
 
-**📖 All documentation has been centralized in [`restore-reports-docs/`](./restore-reports-docs/).**
+** All documentation has been centralized in [`restore-reports-docs/`](./restore-reports-docs/).**
 
 Start there — specifically [`restore-reports-docs/README.md`](./restore-reports-docs/README.md) — for:
 - Project overview & architecture

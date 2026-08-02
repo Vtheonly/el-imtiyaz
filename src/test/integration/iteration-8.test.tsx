@@ -239,13 +239,16 @@ describe("Iteration 8 — modal unification invariant (regression)", () => {
 
     const srcDir = path.resolve(__dirname, "../../..");
     const files = walk(srcDir);
-    const allowed = ["unified-modal.tsx"];
+    // Allow the unified-modal primitive + its extracted sub-components.
+    const allowed = ["unified-modal.tsx", "unified-modal/modal-shell.tsx", "unified-modal/parts.tsx", "unified-modal/confirm-modal.tsx"];
     const violations: string[] = [];
     for (const file of files) {
       const rel = path.relative(srcDir, file);
       if (allowed.some((a) => rel.endsWith(a))) continue;
       // Skip test files — they may reference the import path as a string.
       if (rel.includes("test/") || rel.includes(".test.")) continue;
+      // Skip the unified-modal subfolder (extracted sub-components).
+      if (rel.includes("unified-modal/")) continue;
       const content = fs.readFileSync(file, "utf-8");
       if (content.includes('from "@radix-ui/react-dialog"')) {
         violations.push(rel);

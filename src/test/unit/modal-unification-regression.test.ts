@@ -16,13 +16,16 @@ import { join, extname } from "node:path";
 
 const SRC_ROOT = join(__dirname, "..", "..");
 const ALLOWED_FILES = new Set<string>([
-  // The unified modal primitive itself — it MUST import radix dialog.
+  // The unified modal primitive + its extracted sub-components — they MUST import radix dialog.
   "shared/ui/unified-modal.tsx",
+  "shared/ui/unified-modal/modal-shell.tsx",
+  "shared/ui/unified-modal/parts.tsx",
 ]);
 
 const ALLOWED_PREFIXES = [
   "test/",
   "shared/ui/unified-modal.test",
+  "shared/ui/unified-modal/", // sub-components of UnifiedModal
 ];
 
 function walk(dir: string, out: string[] = []): string[] {

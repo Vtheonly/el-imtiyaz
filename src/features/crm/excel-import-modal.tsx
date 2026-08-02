@@ -36,6 +36,7 @@ import { UnifiedModal, type UnifiedModalProps } from "../../shared/ui/unified-mo
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { ImportEngine } from "../../infrastructure/excel/import-engine";
+import { RepositoryStorageAdapter } from "../../infrastructure/excel/import-engine/storage/repository-adapter";
 import type { ImportContext } from "../../infrastructure/excel/import-engine";
 
 type Stage = "select" | "preview" | "committing" | "done";
@@ -74,10 +75,19 @@ export function ExcelImportModal({
     setAlert(null);
   }
 
-  /** Build (or reuse) an ImportEngine wired to the project's audit log. */
+  /** Build (or reuse) an ImportEngine wired to the project's audit log + real repositories. */
   function getEngine(): ImportEngine {
     if (!engineRef.current) {
+      // The bridge adapter delegates ETAT upserts to ParentRepository +
+      // StudentRepository — this is the fix that makes Excel imports
+      // actually persist students into the CRM.
+      const storage = new RepositoryStorageAdapter({
+        parents: repos.parents,
+        students: repos.students,
+        tenantId: session?.tenantId ?? "default",
+      });
       engineRef.current = new ImportEngine({
+        storage,
         auditSink: {
           async logAction(action, entityType, entityId, diff, note) {
             await repos.audit.log({
@@ -163,15 +173,15 @@ export function ExcelImportModal({
       // for sync (mock data is flagged at queue time and skipped).
       // We peek at the storage adapter to recover the inserted rows.
       const storage = engine.getStorage();
-      const allRecords = typeof (storage as any).listInsertedForRun === "function"
-        ? await (storage as any).listInsertedForRun(ctx.runId)
+      const allRecords = typeof storage.listInsertedForRun === "function"
+        ? await storage.listInsertedForRun(ctx.runId)
         : [];
       let enqueuedForSync = 0;
       for (const rec of allRecords) {
         await sync.enqueue({
           entity: "student",
           operation: "insert",
-          payload: rec,
+          payload: rec as unknown as Record<string, unknown>,
           // Excel import = real data → isMock: false. The sync layer
           // will push this to Supabase as soon as the desktop is online.
           isMock: false,

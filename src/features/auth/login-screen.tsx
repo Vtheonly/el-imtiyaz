@@ -78,7 +78,7 @@ export function LoginScreen() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} El-Imtiyaz. Tous droits réservés.
+             {new Date().getFullYear()} El-Imtiyaz. Tous droits réservés.
           </p>
         </div>
 
