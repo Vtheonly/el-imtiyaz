@@ -18,6 +18,7 @@ export default defineConfig({
       include: [
         "src/core/**/*.ts",
         "src/domain/**/*.ts",
+        "src/domain/calc/**/*.ts",
         "src/shared/components/**/*.tsx",
       ],
       exclude: [

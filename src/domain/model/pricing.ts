@@ -36,9 +36,9 @@
  */
 import type { AcademicLevel } from "./student";
 import type { GradeLevel } from "./student";
-import { GRADE_LEVELS, academicLevelFromGradeLevel, gradeLevelFromLevelYear } from "./student";
+import { GRADE_LEVELS } from "./student";
 import type { TransportDestination } from "./parent";
-import { TRANSPORT_DESTINATIONS, cityTierToDestination } from "./parent";
+import { TRANSPORT_DESTINATIONS } from "./parent";
 
 export type PricingCategory =
   | "tuition"
@@ -148,143 +148,32 @@ export interface PricingConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Lookups & helpers
+// Lookups & helpers — REFACTORED (iteration 1)
+//
+// The implementations now live in `@/domain/calc/pricing/`. The exports
+// below are thin re-exports so existing imports from `@/domain/model/pricing`
+// keep working. Once all call sites migrate to `@/domain/calc`, these
+// re-exports can be removed.
 // ---------------------------------------------------------------------------
 
-/** Convenience: look up the TuitionPricing for a granular grade level. */
-export function tuitionForGradeLevel(
-  config: PricingConfig,
-  gradeLevel: GradeLevel,
-): TuitionPricing {
-  return config.tuitionByGradeLevel[gradeLevel] ?? { annualAmount: 0, installments: [0, 0, 0] };
-}
+export {
+  tuitionForGradeLevel,
+  tuitionForLevel,
+  tuitionTranchesForGrade,
+  tuitionTranches,
+} from "../calc/pricing/tuition";
 
-/**
- * Convenience: look up the annual tuition for an `AcademicLevel`.
- *
- * Returns the tuition of the FIRST grade level within that academic level.
- * This is a best-effort fallback for legacy callers — new code should
- * use `tuitionForGradeLevel` directly.
- */
-export function tuitionForLevel(config: PricingConfig, level: AcademicLevel): number {
-  const firstGrade = GRADE_LEVELS.find((g) => academicLevelFromGradeLevel(g) === level);
-  if (!firstGrade) return 0;
-  return tuitionForGradeLevel(config, firstGrade).annualAmount;
-}
+export {
+  transportForDestination,
+  transportForTier,
+  transportTranchesForDestination,
+} from "../calc/pricing/transport";
 
-/** Convenience: look up transport pricing for a destination. */
-export function transportForDestination(
-  config: PricingConfig,
-  destination: TransportDestination,
-): TransportPricing {
-  return (
-    config.transportByDestination[destination] ?? {
-      annualAmount: 0,
-      installments: [0, 0, 0],
-    }
-  );
-}
-
-/** Convenience: look up transport annual amount for a legacy tier. */
-export function transportForTier(
-  config: PricingConfig,
-  tier: "t1" | "t2" | "t3",
-): number {
-  const destination = cityTierToDestination(tier);
-  if (!destination) return 0;
-  return transportForDestination(config, destination).annualAmount;
-}
-
-/**
- * Compute the 3-tranche schedule for tuition given a grade level.
- *
- * Returns the per-tranche schedule stored in `PricingConfig.tuitionByGradeLevel`
- * — which may be a non-equal split per the official fee schedule.
- */
-export function tuitionTranchesForGrade(
-  config: PricingConfig,
-  gradeLevel: GradeLevel,
-): ReadonlyArray<{ label: string; amountDue: number }> {
-  const pricing = tuitionForGradeLevel(config, gradeLevel);
-  return [
-    { label: "Tranche 1 (Sept–Déc)", amountDue: pricing.installments[0] },
-    { label: "Tranche 2 (Jan–Mar)", amountDue: pricing.installments[1] },
-    { label: "Tranche 3 (Avr–Juin)", amountDue: pricing.installments[2] },
-  ];
-}
-
-/**
- * Compute the 3-tranche schedule for tuition given a flat total amount.
- *
- * Returns an equal 3-way split with the remainder in tranche 3.
- * Used for ad-hoc / non-grade-level tuition pricing.
- */
-export function tuitionTranches(
-  totalAmount: number,
-): ReadonlyArray<{ label: string; amountDue: number }> {
-  const perTranche = Math.round(totalAmount / 3);
-  const last = totalAmount - perTranche * 2; // remainder goes to last tranche
-  return [
-    { label: "Tranche 1", amountDue: perTranche },
-    { label: "Tranche 2", amountDue: perTranche },
-    { label: "Tranche 3", amountDue: last },
-  ];
-}
-
-/**
- * Compute the 3-tranche schedule for transport given a destination.
- *
- * Tranche 1 is due at registration, Tranche 2 Dec 01–15, Tranche 3 Mar 01–15.
- */
-export function transportTranchesForDestination(
-  config: PricingConfig,
-  destination: TransportDestination,
-): ReadonlyArray<{ label: string; amountDue: number }> {
-  const pricing = transportForDestination(config, destination);
-  return [
-    { label: "Tranche 1 (À l'inscription)", amountDue: pricing.installments[0] },
-    { label: "Tranche 2 (01 Déc – 15 Déc)", amountDue: pricing.installments[1] },
-    { label: "Tranche 3 (01 Mar – 15 Mar)", amountDue: pricing.installments[2] },
-  ];
-}
-
-/** Apply a discount to a base amount. Returns the discounted total. */
-export function applyDiscount(
-  baseAmount: number,
-  discount: { amount: number; discountType: DiscountType },
-): number {
-  if (discount.discountType === "percentage") {
-    const pct = Math.max(0, Math.min(100, discount.amount));
-    return Math.round(baseAmount * (1 - pct / 100));
-  }
-  // fixed_amount — stored as negative number; subtract the negative to apply.
-  return Math.max(0, baseAmount + discount.amount);
-}
-
-/** Find a discount entry by its canonical code. */
-export function findDiscountByCode(
-  config: PricingConfig,
-  code: DiscountCode,
-): PricingEntry | undefined {
-  return config.discounts.find((d) => d.discountCode === code && d.isActive);
-}
-
-/**
- * Compute the total discount amount for a parent with N children, applying
- * the sibling_fixed discount once per additional child.
- *
- * Example: 3 children → 2 × sibling_fixed discount (i.e., 2 × −5 000 DA = −10 000 DA).
- */
-export function computeSiblingDiscount(
-  config: PricingConfig,
-  childrenCount: number,
-): number {
-  if (childrenCount <= 1) return 0;
-  const entry = findDiscountByCode(config, "sibling_fixed");
-  if (!entry) return 0;
-  // `amount` is stored as a negative number for fixed_amount discounts.
-  return entry.amount * (childrenCount - 1);
-}
+export {
+  applyDiscount,
+  findDiscountByCode,
+  computeSiblingDiscount,
+} from "../calc/pricing/discounts";
 
 export const PRICING_CATEGORY_LABELS_FR: Record<PricingCategory, string> = {
   tuition: "Scolarité",
