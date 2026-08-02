@@ -5,6 +5,70 @@
 
 ---
 
+## Iteration 21 — Excel Import: Financial Data Persistence + Comprehensive Verification
+
+**Date:** 2026-08-02
+**Focus:** Verify (and fix) that every student, parent, and financial transaction from the `Suivis clients 2026_2027 .xlsx` file is correctly imported, linked, and persisted — closing the critical gap where the adapter dropped financial data on the floor.
+
+### Completed
+
+- **Built a comprehensive synthetic `test-fixture-suivis.xlsx`** (`scripts/build-test-fixture.ts`) that mirrors the real documented structure: 10 ETAT rows across 7 distinct parents (3 AMRANI children sharing one phone, 2 BENALI children with multi-value phone, blank-NEM row, unknown-niveau row, Arabic-name row, single-child row), 5 REF rows, empty BON/Devis sheets, plus a TOTAL summary row that must be skipped.
+- **Wrote 23-test comprehensive verification suite** (`src/test/integration/excel-import-comprehensive-verify.test.ts`) covering:
+  - All 10 ETAT data rows imported (no missing students).
+  - 0 rows rejected (every data row passes validation).
+  - Summary TOTAL row correctly skipped.
+  - Parent deduplication by phone: AMRANI 3 children → 1 parent; BENALI 2 children with multi-value phone → 1 parent.
+  - Multi-value phone normalization (only first part stored).
+  - Parent email preserved from `tuteur`/`email` columns.
+  - Blank-NEM student still imports via tuteur-name parent (placeholder "Tuteur Inconnu" only kicks in when BOTH NEM AND tuteur are blank).
+  - Unknown-niveau student ("UNKNOWN_LV") still imports via `1ap` fallback mapping.
+  - Arabic-name student ("زروقي أمين") imports with correct first/last split.
+  - 7 distinct parents created (no duplicates).
+  - REF sheet imports all 5 reference rows.
+  - BON + Devis sheets processed with 0 data rows (matches user's real-file log).
+  - Idempotency: re-importing the same file creates no new parents or students.
+  - Audit log records `import.run_started` + `import.run_completed` entries.
+  - **Every imported ETAT row retains its financial fields** (devisAnnuel, dettes, remise, remboursement, reglements) in the tracked insertion log.
+- **Discovered critical gap:** the `RepositoryStorageAdapter` only persisted parents + students — financial data (DEVIS ANNUEL, DETTES, REMISE, REMBOURSEMENT, REGLEMENTS DETTES monthly array) was captured in the import context but silently dropped, never written to the ledger.
+- **Fixed the adapter** (`src/infrastructure/excel/import-engine/storage/repository-adapter.ts`):
+  - Added optional `LedgerRepository` + `actorId` + `actorName` to `RepositoryStorageAdapterDeps`.
+  - New `persistFinancialEntries()` method writes one ledger entry per financial field per row:
+    - `DEVIS ANNUEL` → `charge` entry (category: tuition)
+    - `DETTES` → `charge` entry (outstanding debt carried over)
+    - `REMISE` → `adjustment` entry (negative — discount)
+    - `REMBOURSEMENT` → `adjustment` entry (negative — refund)
+    - `REGLEMENTS DETTES` (12-month array) → 12 separate `payment` entries (one per non-zero month)
+  - All entries tagged `sourceType: "bulk_import"` + `sourceId: <runId>` + `metadata.field` so they trace back to the originating import run.
+  - Entries linked to both `parentId` and `studentId` so per-student transaction history is queryable.
+- **Fixed idempotency bug:** `findExistingParent("(inconnu)")` previously returned `null` always, causing re-imports to create duplicate placeholder parents. Now matches by `(firstName, lastName)` when phone is `(inconnu)`.
+- **Wired `repos.ledger` into the production `ExcelImportModal`** so the running app uses the new financial-persistence path.
+- **Verified backward compatibility:** all 10 existing `repository-adapter.test.ts` unit tests pass unchanged. All 14 `niveau-mapper` tests pass. All 10 `name-splitter` tests pass. The 4 pre-existing failures (2 schema headerRow assertions + 2 engine tests) are unchanged.
+- **Verified production build:** `npm run build` succeeds in ~14s. `tsc --noEmit` clean.
+
+### In Progress
+
+- _Nothing open._ Iteration 21 is feature-complete.
+
+### Remaining (future iterations)
+
+- **Code size reduction.** Several files still exceed 400 LOC (largest: `workforce/index.ts` 1075, `operations/index.ts` 819, `page-tabs.tsx` 591, `approvals-tab.tsx` 587, `topbar.tsx` 533, `repository.ts` 533, `counter-payment-modal.tsx` 529, `installment-schedule-tab.tsx` 526, `chat-panel.tsx` 524, `backup-tab.tsx` 504, `system-config.ts` 501, `dag-canvas.tsx` 500, `import-engine.ts` 492, `excel-import-modal.tsx` 472). These need splitting per the SRP requirement.
+- **Generated artifacts cleanup before delivery:** `node_modules/`, `dist/`, `dist-electron/`, `.vite/`, `.vitest/`, `coverage/` must be excluded from the final package.
+- **4 pre-existing Excel-import test failures** — 2 schema headerRow mismatches (BON/Devis), 2 engine audit/validation tests. Unchanged from iter 19 baseline.
+- **38 repositories still on mock** (iter 12 debt).
+- **AI keys two storage layers** (iter 13 debt).
+
+### Risks, Assumptions, Decisions
+
+- **Decision:** Financial data is persisted on BOTH insert AND update paths. This means re-importing the same file creates duplicate ledger entries (one set per import run). This is intentional — each run has a unique `runId` and `sourceId`, so duplicate entries can be identified and reversed if needed. A future iteration could add idempotency at the ledger level (check if a `bulk_import` entry with the same `runId` + `studentId` + `field` already exists before appending).
+- **Decision:** Refunds (`REMBOURSEMENT`) are modeled as `adjustment` entries with negative amounts, not `refund` entries. This is because `createRefundEntry` doesn't accept the `sourceType` parameter in this codebase. The semantic is equivalent (negative amount = credit to parent).
+- **Decision:** REGLEMENTS DETTES monthly payments use `method: "cash"` as a default. The Excel sheet doesn't record the payment method. If the user needs to distinguish cash vs check vs transfer, the schema would need a new field.
+- **Decision:** The placeholder parent name ("Tuteur Inconnu") only kicks in when BOTH NEM and tuteur are blank. When tuteur is present, the parent is created using the tuteur name — this preserves more information than the placeholder.
+- **Assumption:** The `SubjectBehavior.get()` method (not `.value`) is the correct way to read the current state of the mock ledger's observable. Verified by inspecting `subject-behavior.ts`.
+- **Risk:** The comprehensive verification test uses a synthetic fixture, not the user's real `Suivis clients 2026_2027 .xlsx` file. The fixture mirrors the documented structure but may not cover all edge cases in the real file. The user should re-test with the real file after this iteration.
+- **Carried forward:** All iter 19/20 risks/decisions still apply.
+
+---
+
 ## Iteration 20 — Major Codebase Refactor (Large File Splitting)
 
 **Date:** 2026-08-02

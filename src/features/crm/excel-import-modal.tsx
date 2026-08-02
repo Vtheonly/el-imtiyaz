@@ -57,6 +57,19 @@ export function ExcelImportModal({
   const sync = useSyncActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const engineRef = useRef<ImportEngine | null>(null);
+  /**
+   * Persist the selected File object across stages.
+   *
+   * The previous implementation re-read `fileInputRef.current?.files` during
+   * `commit()`, but in Electron and some browsers the FileList becomes stale
+   * (null/empty) after the first read — especially after the dry-run parse
+   * triggers re-renders. This caused the false "Fichier introuvable" error
+   * even though the import engine had already processed the file.
+   *
+   * Stashing the File in a ref on selection guarantees `commit()` can always
+   * re-read the bytes for the real (non-dry-run) import.
+   */
+  const fileRef = useRef<File | null>(null);
 
   const [stage, setStage] = useState<Stage>("select");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -73,6 +86,9 @@ export function ExcelImportModal({
     setCommitCtx(null);
     setReports(null);
     setAlert(null);
+    fileRef.current = null;
+    // Clear the input so re-selecting the same file fires onChange again.
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   /** Build (or reuse) an ImportEngine wired to the project's audit log + real repositories. */
@@ -80,11 +96,17 @@ export function ExcelImportModal({
     if (!engineRef.current) {
       // The bridge adapter delegates ETAT upserts to ParentRepository +
       // StudentRepository — this is the fix that makes Excel imports
-      // actually persist students into the CRM.
+      // actually persist students into the CRM. Iteration 21 also wires
+      // the LedgerRepository so each row's financial data (DEVIS ANNUEL,
+      // DETTES, REMISE, REMBOURSEMENT, REGLEMENTS DETTES) is written as
+      // ledger entries linked to the imported student.
       const storage = new RepositoryStorageAdapter({
         parents: repos.parents,
         students: repos.students,
+        ledger: repos.ledger,
         tenantId: session?.tenantId ?? "default",
+        actorId: session?.userId ?? "system",
+        actorName: session?.displayName ?? "System",
       });
       engineRef.current = new ImportEngine({
         storage,
@@ -110,6 +132,9 @@ export function ExcelImportModal({
   async function handleFile(file: File) {
     setParsing(true);
     setAlert(null);
+    // Stash the File so commit() can re-read it without relying on the
+    // input element's (stale) FileList. See fileRef docs above.
+    fileRef.current = file;
     try {
       const engine = getEngine();
       // Dry-run import — validates + shows stats without writing to storage.
@@ -121,17 +146,17 @@ export function ExcelImportModal({
       setFileName(file.name);
       setStage("preview");
 
-      if (ctx.errors.length > 0) {
-        setAlert({
-          tone: "warning",
-          title: `${ctx.errors.length} erreur(s) de validation`,
-          description: "Corrigez le fichier et rechargez-le. L'import sera impossible tant qu'il y a des erreurs.",
-        });
-      } else if (ctx.stats.rowsRead === 0) {
+      if (ctx.stats.rowsRead === 0) {
         setAlert({
           tone: "warning",
           title: "Aucune ligne à importer",
           description: "Le fichier est vide ou aucune feuille ne correspond à un schéma connu.",
+        });
+      } else if (ctx.stats.warnings > 0) {
+        setAlert({
+          tone: "info",
+          title: `${ctx.stats.rowsRead} ligne(s) prête(s) à importer (${ctx.stats.warnings} avertissement(s))`,
+          description: "Toutes les lignes seront importées. Les avertissements indiquent des données manquantes ou non standard qui ont été corrigées automatiquement (ex: CLASSE manquant → « Non assignée »).",
         });
       } else {
         setAlert({
@@ -156,12 +181,13 @@ export function ExcelImportModal({
     setStage("committing");
     setAlert(null);
     try {
-      // Re-read the file (we don't keep the bytes around between stages).
-      const fileList = fileInputRef.current?.files;
-      if (!fileList || fileList.length === 0) {
+      // Use the stashed File from the selection stage. This avoids the
+      // "Fichier introuvable" error that occurred when the input element's
+      // FileList became stale between the dry-run and the real import.
+      const file = fileRef.current;
+      if (!file) {
         throw new Error("Fichier introuvable — veuillez le recharger.");
       }
-      const file = fileList[0];
       const engine = getEngine();
       const ctx = await engine.importFile(file, file.name, {
         dryRun: false,
@@ -222,7 +248,12 @@ export function ExcelImportModal({
   const showFooter = stage === "preview" || stage === "done";
   const totalRows = previewCtx?.stats.rowsRead ?? 0;
   const totalErrors = previewCtx?.errors.length ?? 0;
-  const canCommit = totalErrors === 0 && totalRows > 0;
+  const totalWarnings = previewCtx?.stats.warnings ?? 0;
+  // Iteration 21: "Import student no matter what" — allow commit even with
+  // validation errors. Errors are now downgraded to warnings by the validator,
+  // so `totalErrors` should always be 0. But even if some slip through, we
+  // only block commit when there are zero rows to import.
+  const canCommit = totalRows > 0;
 
   return (
     <UnifiedModal

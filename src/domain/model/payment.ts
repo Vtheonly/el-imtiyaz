@@ -65,6 +65,37 @@ export interface Installment {
   readonly customSchedule?: boolean;
   /** Optional note describing the custom payment agreement (e.g. "Échelonnement exceptionnel"). */
   readonly customScheduleNote?: string | null;
+  /**
+   * Spec §1.3 — Tranche Period Mapping & Timestamp Visibility.
+   *
+   * The academic semester this tranche covers (1, 2, or 3).
+   * Tranche 1 = Semester 1 (Sept–Oct–Nov)
+   * Tranche 2 = Semester 2 (Dec–Jan–Feb)
+   * Tranche 3 = Semester 3 (Mar–Apr–May)
+   */
+  readonly semester?: 1 | 2 | 3;
+  /**
+   * Human-readable month range covered by this tranche, e.g. "Sept–Oct–Nov".
+   * Displayed on schedule cards and generated receipts so parents can see
+   * exactly what period a tranche pays for.
+   */
+  readonly coveredMonths?: string;
+  /**
+   * Spec §1.4 — Dual Payment Modes & Partial Tranche Payments.
+   *
+   * The payment strategy chosen by the parent:
+   *   - "full_annual": single up-front payment for the entire year (10% discount)
+   *   - "tranches":    standard 3-tranche schedule (default)
+   *
+   * When undefined, defaults to "tranches" for backward compatibility.
+   */
+  readonly paymentMode?: PaymentMode;
+  /**
+   * Percentage of the tranche that has been paid (0–100).
+   * Computed as `(amountPaid / amountDue) * 100`, clamped to [0, 100].
+   * Stored on the installment so the UI doesn't recompute it everywhere.
+   */
+  readonly percentPaid?: number;
 }
 
 /**
@@ -72,6 +103,62 @@ export interface Installment {
  * Each cycle can have its own default tranche dates and amounts.
  */
 export type AcademicCycle = "primaire" | "cem" | "lycee";
+
+/**
+ * Spec §1.4 — Dual Payment Modes.
+ *
+ * Parents choose between paying the full annual fee up-front (with a 10%
+ * discount per the official 2026–2027 schedule) or spreading payments
+ * across the standard 3-tranche schedule.
+ */
+export type PaymentMode = "full_annual" | "tranches";
+
+export const PAYMENT_MODE_LABELS_FR: Record<PaymentMode, string> = {
+  full_annual: "Paiement annuel complet (−10%)",
+  tranches: "Paiement par tranches (3 échéances)",
+};
+
+/**
+ * Spec §1.3 — Tranche → Semester → Month-range mapping.
+ *
+ * Each tranche maps to a fixed academic semester and a 3-month range.
+ * This eliminates ambiguity about what period a tranche covers.
+ *
+ * Tranche 1 = Semester 1 = Sept–Oct–Nov (start of school year)
+ * Tranche 2 = Semester 2 = Dec–Jan–Feb
+ * Tranche 3 = Semester 3 = Mar–Apr–May
+ */
+export const TRANCHE_SEMESTER_MAP: Readonly<Record<1 | 2 | 3, { semester: 1 | 2 | 3; months: string; monthRange: readonly [number, number, number] }>> = {
+  1: { semester: 1, months: "Sept–Oct–Nov", monthRange: [9, 10, 11] },
+  2: { semester: 2, months: "Dec–Jan–Feb", monthRange: [12, 1, 2] },
+  3: { semester: 3, months: "Mar–Apr–May", monthRange: [3, 4, 5] },
+};
+
+/**
+ * Derive the tranche number (1, 2, or 3) from an installment label.
+ * Returns `null` if the label doesn't match the "Tranche N" pattern.
+ */
+export function trancheNumberFromLabel(label: string): 1 | 2 | 3 | null {
+  const match = label.match(/tranche\s*([123])/i);
+  if (!match) return null;
+  return Number(match[1]) as 1 | 2 | 3;
+}
+
+/**
+ * Resolve the semester + month-range metadata for an installment.
+ *
+ * Falls back to deriving from the label if `installment.semester` is not set,
+ * so legacy installments (created before spec §1.3) still display correctly.
+ */
+export function resolveTranchePeriod(installment: Installment): { semester: 1 | 2 | 3 | null; months: string | null } {
+  if (installment.semester && installment.coveredMonths) {
+    return { semester: installment.semester, months: installment.coveredMonths };
+  }
+  const num = trancheNumberFromLabel(installment.label);
+  if (!num) return { semester: null, months: null };
+  const meta = TRANCHE_SEMESTER_MAP[num];
+  return { semester: meta.semester, months: meta.months };
+}
 
 export const ACADEMIC_CYCLE_LABELS_FR: Record<AcademicCycle, string> = {
   primaire: "Primaire",
@@ -224,6 +311,11 @@ export {
   overdueAmount,
   maxDaysOverdue,
   agingBucketFromDays,
+  computePartialAmount,
+  computePartialOfRemaining,
+  computePercentageForAmount,
+  applyPartialPayment,
+  computeFullAnnualDiscountedTotal,
 } from "../calc/payment/installments";
 
 export {

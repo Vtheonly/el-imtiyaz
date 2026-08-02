@@ -26,16 +26,25 @@ import type { ImportContext } from "../import-context";
 import { objectChecksum } from "../utils/checksum";
 import { StorageAdapter, type StorageRecord, type RunAuditEntry } from "./storage-adapter";
 import { uuid } from "../utils/id";
-import type { ParentRepository, StudentRepository } from "../../../../domain/repository/repository";
+import type { ParentRepository, StudentRepository, LedgerRepository } from "../../../../domain/repository/repository";
 import type { Parent, CreateParentInput } from "../../../../domain/model/parent";
-import type { CreateStudentInput } from "../../../../domain/model/student";
+import type { CreateStudentInput, Student } from "../../../../domain/model/student";
+import type { LedgerEntry } from "../../../../domain/model/ledger";
+import { createChargeEntry, createPaymentEntry, createAdjustmentEntry } from "../../../../domain/calc/ledger/entries";
 import { mapNiveauCode } from "../mappers/niveau-mapper";
 import { splitFullName } from "../mappers/name-splitter";
 
 export interface RepositoryStorageAdapterDeps {
   readonly parents: ParentRepository;
   readonly students: StudentRepository;
+  /** Optional — when provided, the adapter writes charge/payment/adjustment
+   * ledger entries for each ETAT row's financial fields. Without a ledger,
+   * financial data (DEVIS ANNUEL, DETTES, REMISE, REGLEMENTS) is captured
+   * in the import context but not persisted. */
+  readonly ledger?: LedgerRepository;
   readonly tenantId: string;
+  readonly actorId?: string;
+  readonly actorName?: string;
 }
 
 interface InsertedRow {
@@ -173,14 +182,25 @@ export class RepositoryStorageAdapter extends StorageAdapter {
     const studentInput = this.buildStudentInput(record);
     const existing = await this.findExistingStudent(parent, studentInput);
     let action: "insert" | "update" | "skip";
+    let studentId: string | null = null;
     if (existing) {
       action = "update";
+      studentId = existing.id;
     } else {
       const result = await this.deps.students.createStudent(parent.id, studentInput);
       if (!result.ok) {
         return { action: "skip" };
       }
       action = "insert";
+      studentId = result.value.id;
+    }
+    // Persist financial data (DEVIS ANNUEL charge, REMISE adjustment, DETTES
+    // charge, REMBOURSEMENT refund, REGLEMENTS DETTES payments) to the ledger
+    // so each student's transactions, balances, and payment history are
+    // queryable from the CRM. Without this, financial data is dropped on
+    // the floor — see iteration 21.
+    if (this.deps.ledger && studentId) {
+      await this.persistFinancialEntries(record, parent.id, studentId, runId);
     }
     this.trackInsertedRow("etat", record, ["NEM", "NOM"], runId);
     return { action };
@@ -188,7 +208,7 @@ export class RepositoryStorageAdapter extends StorageAdapter {
 
   private async ensureParent(record: ImportRecord): Promise<Parent | null> {
     const input = this.buildParentInput(record);
-    const existing = await this.findExistingParent(input.phone);
+    const existing = await this.findExistingParent(input);
     if (existing) return existing;
     const result = await this.deps.parents.createParent(input);
     return result.ok ? result.value : null;
@@ -211,11 +231,31 @@ export class RepositoryStorageAdapter extends StorageAdapter {
     };
   }
 
-  private async findExistingParent(phone: string): Promise<Parent | null> {
-    if (!phone || phone === "(inconnu)") return null;
-    const result = await this.deps.parents.search(phone);
+  /**
+   * Find an existing parent by phone first; when phone is "(inconnu)"
+   * (blank NEM), fall back to matching on (firstName, lastName) so that
+   * re-imports don't create duplicate placeholder parents.
+   */
+  private async findExistingParent(input: CreateParentInput): Promise<Parent | null> {
+    if (input.phone && input.phone !== "(inconnu)") {
+      const result = await this.deps.parents.search(input.phone);
+      if (result.ok) {
+        const match = result.value.find((p) => p.phone === input.phone);
+        if (match) return match;
+      }
+      return null;
+    }
+    // Placeholder parent — match by name to keep re-imports idempotent.
+    const result = await this.deps.parents.search(input.firstName || input.lastName);
     if (!result.ok) return null;
-    return result.value.find((p) => p.phone === phone) ?? null;
+    return (
+      result.value.find(
+        (p) =>
+          p.phone === "(inconnu)" &&
+          p.firstName === input.firstName &&
+          p.lastName === input.lastName,
+      ) ?? null
+    );
   }
 
   private buildStudentInput(record: ImportRecord): CreateStudentInput {
@@ -238,12 +278,13 @@ export class RepositoryStorageAdapter extends StorageAdapter {
   private async findExistingStudent(
     parent: Parent,
     input: CreateStudentInput,
-  ): Promise<boolean> {
+  ): Promise<Student | null> {
     const result = await this.deps.students.search(
       `${input.firstName} ${input.lastName}`.trim(),
     );
-    if (!result.ok) return false;
-    return result.value.some((s) => s.parentId === parent.id);
+    if (!result.ok) return null;
+    const match = result.value.find((s) => s.parentId === parent.id);
+    return match ?? null;
   }
 
   private extractPhone(record: ImportRecord): string {
@@ -254,6 +295,160 @@ export class RepositoryStorageAdapter extends StorageAdapter {
       return first ?? "";
     }
     return "";
+  }
+
+  // ── Financial persistence ─────────────────────────────────────────────
+  //
+  // Each ETAT row carries 5 financial fields that MUST be persisted to the
+  // ledger so each student's transactions, balances, and payment history
+  // are queryable from the CRM:
+  //
+  //   DEVIS ANNUEL    → charge entry (category: tuition)
+  //   DETTES          → charge entry (category: tuition — outstanding debt carried over)
+  //   REMISE          → adjustment entry (negative — discount, category: tuition)
+  //   REMBOURSEMENT   → refund entry (category: tuition)
+  //   REGLEMENTS DETTES (12-month array) → 12 payment entries (category: tuition)
+  //
+  // All entries are tagged with sourceType="bulk_import" and sourceId=runId
+  // so they can be traced back to the originating import run. Re-imports
+  // are idempotent at the row level: the engine's UpsertMatcher decides
+  // insert vs update; the ledger append is always additive (the engine
+  // dedupes by row checksum before reaching this point).
+  private async persistFinancialEntries(
+    record: ImportRecord,
+    parentId: string,
+    studentId: string,
+    runId: string,
+  ): Promise<void> {
+    if (!this.deps.ledger) return;
+    const ledger = this.deps.ledger;
+    const tenantId = this.deps.tenantId;
+    const actorId = this.deps.actorId ?? "excel-import";
+    const actorName = this.deps.actorName ?? "Excel Import";
+    const at = new Date().toISOString();
+    const entries: LedgerEntry[] = [];
+
+    const devisAnnuel = numOrZero(record.devisAnnuel);
+    const dettes = numOrZero(record.dettes);
+    const remise = numOrZero(record.remise);
+    const remboursement = numOrZero(record.remboursement);
+    const reglements = record.reglements;
+    const regMap = isMonthMap(reglements) ? reglements : {};
+
+    // DEVIS ANNUEL — the annual tuition quote (always a charge).
+    if (devisAnnuel > 0) {
+      entries.push(
+        createChargeEntry({
+          tenantId,
+          parentId,
+          studentId,
+          category: "tuition",
+          amount: devisAnnuel,
+          sourceType: "bulk_import",
+          sourceId: runId,
+          description: `Devis annuel (import Excel run ${runId})`,
+          actorId,
+          actorName,
+          at,
+          metadata: { field: "DEVIS_ANNUEL", importRunId: runId },
+        }),
+      );
+    }
+
+    // DETTES — outstanding debt carried over from prior years (additional charge).
+    if (dettes > 0) {
+      entries.push(
+        createChargeEntry({
+          tenantId,
+          parentId,
+          studentId,
+          category: "tuition",
+          amount: dettes,
+          sourceType: "bulk_import",
+          sourceId: runId,
+          description: `Dettes antérieures (import Excel run ${runId})`,
+          actorId,
+          actorName,
+          at,
+          metadata: { field: "DETTES", importRunId: runId },
+        }),
+      );
+    }
+
+    // REMISE — discount applied to the annual quote (credit adjustment).
+    if (remise > 0) {
+      entries.push(
+        createAdjustmentEntry({
+          tenantId,
+          parentId,
+          studentId,
+          category: "tuition",
+          amount: -remise, // negative = credit (discount)
+          reason: `Remise sur devis (import Excel run ${runId})`,
+          sourceType: "bulk_import",
+          sourceId: runId,
+          actorId,
+          actorName,
+          at,
+          metadata: { field: "REMISE", importRunId: runId },
+        }),
+      );
+    }
+
+    // REMBOURSEMENT — refund issued to the parent.
+    if (remboursement > 0) {
+      // Refunds are negative entries (money out). We model them as an
+      // adjustment with a negative amount — using createAdjustmentEntry
+      // because createRefundEntry doesn't accept the same sourceType
+      // metadata shape in this codebase.
+      entries.push(
+        createAdjustmentEntry({
+          tenantId,
+          parentId,
+          studentId,
+          category: "tuition",
+          amount: -remboursement,
+          reason: `Remboursement (import Excel run ${runId})`,
+          sourceType: "bulk_import",
+          sourceId: runId,
+          actorId,
+          actorName,
+          at,
+          metadata: { field: "REMBOURSEMENT", importRunId: runId },
+        }),
+      );
+    }
+
+    // REGLEMENTS DETTES — 12 monthly payments (sep..aug). Each non-zero
+    // month becomes a separate payment entry so the student's payment
+    // history is granular and matches the Excel sheet exactly.
+    const MONTH_KEYS = ["sep", "oct", "nov", "dec", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug"];
+    for (const month of MONTH_KEYS) {
+      const amount = numOrZero(regMap[month]);
+      if (amount <= 0) continue;
+      entries.push(
+        createPaymentEntry({
+          tenantId,
+          parentId,
+          studentId,
+          category: "tuition",
+          amount,
+          method: "cash", // assumed — the Excel sheet doesn't record the method
+          receiptNumber: `${runId}-${month}`,
+          paymentStatus: "paid",
+          sourceType: "bulk_import",
+          sourceId: runId,
+          description: `Règlement dettes ${month} (import Excel run ${runId})`,
+          actorId,
+          actorName,
+          at,
+          metadata: { field: "REGLEMENTS_DETTES", month, importRunId: runId },
+        }),
+      );
+    }
+
+    if (entries.length === 0) return;
+    await ledger.appendMany(entries);
   }
 
   // ── Generic tracked upsert (BON, Devis, REF) ──────────────────────────
@@ -299,4 +494,24 @@ export class RepositoryStorageAdapter extends StorageAdapter {
 /** Compute checksums asynchronously after batching (kept for API parity). */
 export async function hashRecord(record: ImportRecord): Promise<string> {
   return objectChecksum(record as Record<string, unknown>);
+}
+
+/** Coerce a possibly-null/undefined/NaN field value to a clean number. */
+function numOrZero(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    const n = Number(v.trim().replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+/** Type guard: is the value a `Record<string, number>` month map? */
+function isMonthMap(v: unknown): v is Record<string, number> {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
+  for (const val of Object.values(v as Record<string, unknown>)) {
+    if (typeof val !== "number") return false;
+  }
+  return true;
 }

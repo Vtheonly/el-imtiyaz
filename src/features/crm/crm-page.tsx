@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Filter, Search, Download, Phone, MessageCircle, Mail, Eye, Users, GraduationCap, UserPlus } from "lucide-react";
+import { Plus, Filter, Search, Download, Phone, MessageCircle, Mail, Eye, Users, GraduationCap, UserPlus, Calculator } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import type { Parent } from "../../domain/model/parent";
 import type { Student } from "../../domain/model/student";
@@ -27,6 +27,7 @@ import { BatchRegistrationModal } from "./batch-registration-modal";
 import { ParentDetailDrawer } from "./parent-detail-drawer";
 import { StudentDetailDrawer } from "./student-detail-drawer";
 import { ExcelImportModal } from "./excel-import-modal";
+import { PreRegistrationSimulatorModal } from "./pre-registration-simulator-modal";
 import { FileSpreadsheet, Upload } from "lucide-react";
 
 export function CrmPage() {
@@ -40,6 +41,7 @@ export function CrmPage() {
   const [studentDrawerId, setStudentDrawerId] = useState<string | null>(null);
   const [studentDrawerOpen, setStudentDrawerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
 
   function openParent(parentId: string) {
     setDrawerParentId(parentId);
@@ -58,6 +60,10 @@ export function CrmPage() {
         description="Gestion des parents et des élèves — inscription groupée 1→N, navigation bidirectionnelle"
         actions={
           <>
+            {/* Spec §2.2 — Pre-Registration Cost & Program Estimator */}
+            <Button variant="outline" size="sm" onClick={() => setSimulatorOpen(true)} title="Simulateur de devis pour prospects">
+              <Calculator className="h-4 w-4" /> Simulateur
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" /> Import Excel
             </Button>
@@ -135,6 +141,12 @@ export function CrmPage() {
           // Note: in a future iteration we could pre-fill the parent step.
           void pid;
         }}
+        onOpenStudent={(studentId) => {
+          // Spec §3.1 — smooth transition from parent drawer to student drawer
+          // (no stacked dialogs: close parent first, then open student).
+          setDrawerOpen(false);
+          openStudent(studentId);
+        }}
       />
       <StudentDetailDrawer
         studentId={studentDrawerId}
@@ -151,6 +163,11 @@ export function CrmPage() {
         onImported={() => {
           // Optional: refresh lists — observable handles this automatically
         }}
+      />
+      <PreRegistrationSimulatorModal
+        open={simulatorOpen}
+        onOpenChange={setSimulatorOpen}
+        onStartRegistration={() => setBatchOpen(true)}
       />
     </div>
   );

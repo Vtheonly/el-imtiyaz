@@ -19,6 +19,7 @@
  * button above the daily panel opens the CalendarEventCreatorModal.
  */
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -31,6 +32,7 @@ import {
   Bell,
   Users,
   Calendar as CalendarIcon,
+  ArrowRight,
 } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import { useToast } from "../../app/providers/toast-provider";
@@ -83,6 +85,7 @@ export function DashboardCalendar() {
   const repos = useRepositories();
   const toast = useToast();
   const { session } = useAuth();
+  const navigate = useNavigate();
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today.toISOString().slice(0, 10));
@@ -267,10 +270,25 @@ export function DashboardCalendar() {
                     e.kind === "reminder" ||
                     e.kind === "meeting" ||
                     e.kind === "custom";
+                  // Spec §3.2 — payment_received events are clickable and
+                  // navigate to /financials?tab=payments&paymentId=X
+                  const isPaymentEvent = e.kind === "payment_received";
+                  const isClickable = isPaymentEvent;
+                  function handleEventClick() {
+                    if (isPaymentEvent && e.paymentId) {
+                      navigate(`/financials?tab=payments&paymentId=${e.paymentId}`);
+                    }
+                  }
                   return (
                     <li
                       key={e.id}
-                      className="flex items-start gap-3 p-2.5 hover:bg-accent/5"
+                      className={`flex items-start gap-3 p-2.5 ${
+                        isClickable
+                          ? "cursor-pointer hover:bg-accent/10 group"
+                          : "hover:bg-accent/5"
+                      }`}
+                      onClick={isClickable ? handleEventClick : undefined}
+                      title={isClickable ? "Ouvrir dans le module Finances" : undefined}
                     >
                       <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
                         tone === "success" ? "bg-status-success/15 text-status-success"
@@ -287,6 +305,9 @@ export function DashboardCalendar() {
                             <Badge variant="outline" className="text-[9px] font-mono shrink-0">
                               {e.time}
                             </Badge>
+                          )}
+                          {isClickable && (
+                            <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-primary shrink-0" />
                           )}
                         </div>
                         {e.description && (
@@ -322,7 +343,10 @@ export function DashboardCalendar() {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 text-muted-foreground hover:text-status-danger"
-                          onClick={() => setDeleteTarget(e)}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            setDeleteTarget(e);
+                          }}
                           title="Supprimer"
                         >
                           <Trash2 className="h-3 w-3" />

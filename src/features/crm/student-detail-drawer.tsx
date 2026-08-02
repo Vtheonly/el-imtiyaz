@@ -17,13 +17,14 @@
  * the per-tab rendering to the focused sub-components.
  */
 import {
-  GraduationCap, Calendar, Wallet, Info,
+  GraduationCap, Calendar, Wallet, Info, ArrowLeft, Users,
 } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { UnifiedModal } from "../../shared/ui/unified-modal";
 import { PageTabs, PageTabList, PageTab, PageTabContent } from "../../shared/layout/page-tabs";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
+import { Button } from "../../shared/ui/button";
 import { LEVEL_LABELS_FR } from "../../domain/model/student";
 import { InfoTab } from "./student-detail/info-tab";
 import { AcademicTab } from "./student-detail/academic-tab";
@@ -45,6 +46,10 @@ export function StudentDetailDrawer({
   const student = useObservable(
     () => repos.students.observeById(studentId ?? ""),
     [studentId],
+  );
+  const parent = useObservable(
+    () => repos.parents.observeById(student?.parentId ?? ""),
+    [student?.parentId],
   );
 
   if (!open || !studentId || !student) {
@@ -92,6 +97,22 @@ export function StudentDetailDrawer({
       }
       hideFooter
     >
+      {/* Spec §3.1 — breadcrumb back-to-parent button.
+          Shown only when the student drawer was opened from a parent context
+          (i.e. onOpenParent is wired). One click returns to the parent drawer. */}
+      {onOpenParent && parent && (
+        <div className="mb-3 -mt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground hover:text-primary h-7 px-2"
+            onClick={() => onOpenParent(parent.id)}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Retour au parent: {parent.firstName} {parent.lastName}
+          </Button>
+        </div>
+      )}
       <PageTabs defaultValue="info" variant="underline">
         <PageTabList>
           <PageTab value="info" label="Infos" icon={Info} />

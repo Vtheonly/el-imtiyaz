@@ -3,20 +3,17 @@
  *
  * Extracted from `student-detail-drawer.tsx` (iteration 6-a). Behavior
  * preserved exactly — only file location + import paths changed.
+ *
+ * Spec §1.2 — payment rows now use CollapsiblePaymentRow (accordion) so
+ * staff can expand any payment to see the full metadata inline.
  */
 import { ArrowRight } from "lucide-react";
 import { useRepositories } from "../../../app/providers/repository-provider";
 import { useObservable } from "../../../shared/hooks/use-observable";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../../shared/ui/card";
 import { Button } from "../../../shared/ui/button";
-import { StatusChip } from "../../../shared/ui/status-chip";
 import { formatDzdPlain } from "../../../core/format/currency";
-import { formatRelative } from "../../../core/format/date";
-import {
-  PAYMENT_METHOD_LABELS_FR,
-  PAYMENT_STATUS_LABELS_FR,
-  PAYMENT_CATEGORY_LABELS_FR,
-} from "../../../domain/model/payment";
+import { CollapsiblePaymentRow } from "../../financials/collapsible-payment-row";
 
 export function PaymentsTab({
   studentId,
@@ -98,25 +95,16 @@ export function PaymentsTab({
             </p>
           ) : (
             <ul className="divide-y divide-border">
-              {payments.slice(0, 10).map((p) => (
-                <li key={p.id} className="flex items-center gap-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{p.receiptNumber}</span>
-                      <StatusChip
-                        label={PAYMENT_STATUS_LABELS_FR[p.status]}
-                        tone={p.status === "paid" ? "success" : p.status === "pending" ? "warning" : "neutral"}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {PAYMENT_METHOD_LABELS_FR[p.method]} · {PAYMENT_CATEGORY_LABELS_FR[p.category]}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-mono font-semibold">{formatDzdPlain(p.amount)}</p>
-                    <p className="text-[10px] text-muted-foreground">{formatRelative(p.collectedAt)}</p>
-                  </div>
-                </li>
+              {payments.slice(0, 20).map((p) => (
+                <CollapsiblePaymentRow
+                  key={p.id}
+                  payment={p}
+                  installmentLabel={
+                    p.installmentId
+                      ? installments.find((i) => i.id === p.installmentId)?.label
+                      : undefined
+                  }
+                />
               ))}
             </ul>
           )}

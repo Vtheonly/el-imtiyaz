@@ -3,8 +3,12 @@
  *
  * Pure presentational component — state lives in the orchestrator and is
  * threaded via props.
+ *
+ * Spec §2.3 — adds a "Programmes spécialisés" section for each student:
+ * extracurricular clubs (chess, English, sports, arts), psychology sessions,
+ * and speech therapy (orthophonie). These are billed in Step 3.
  */
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Sparkles, HeartPulse, Speech } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
 import { Badge } from "../../../shared/ui/badge";
@@ -21,6 +25,14 @@ import type { CityTier } from "../../../domain/model/parent";
 import type { Step2Student } from "./types";
 import { EMPTY_STUDENT } from "./types";
 
+/** Available extracurricular clubs — keyed by the pricing-config qualifier. */
+const CLUB_OPTIONS: ReadonlyArray<{ qualifier: string; label: string }> = [
+  { qualifier: "chess_club", label: "Échecs" },
+  { qualifier: "english_club", label: "Anglais" },
+  { qualifier: "sports_club", label: "Sport" },
+  { qualifier: "arts_club", label: "Arts" },
+];
+
 export function Step2({
   students,
   setStudents,
@@ -35,6 +47,13 @@ export function Step2({
   function update(i: number, patch: Partial<Step2Student>) {
     const next = students.map((s, idx) => (idx === i ? { ...s, ...patch } : s));
     setStudents(next);
+  }
+  function toggleClub(i: number, qualifier: string) {
+    const s = students[i];
+    const has = s.clubs.includes(qualifier);
+    update(i, {
+      clubs: has ? s.clubs.filter((c) => c !== qualifier) : [...s.clubs, qualifier],
+    });
   }
   function add() {
     setStudents([
@@ -131,6 +150,91 @@ export function Step2({
                 placeholder="Asthme léger"
               />
             </FormField>
+          </div>
+
+          {/* Spec §2.3 — Specialized programs (Clubs, Psychology, Speech Therapy) */}
+          <div className="rounded-md border border-status-info/30 bg-status-info/5 p-3 space-y-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-status-info flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              Programmes spécialisés
+            </p>
+            {/* Clubs */}
+            <div>
+              <p className="text-[11px] text-muted-foreground mb-1.5">Clubs & activités parascolaires</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CLUB_OPTIONS.map((c) => {
+                  const active = s.clubs.includes(c.qualifier);
+                  return (
+                    <button
+                      key={c.qualifier}
+                      type="button"
+                      onClick={() => toggleClub(i, c.qualifier)}
+                      className={`px-2.5 py-1 rounded-md text-xs border transition-colors ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-border text-muted-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Psychology + Speech Therapy */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <FormField label="Psychologie (séances)">
+                <Select
+                  value={s.psychologyMode ?? "__none__"}
+                  onValueChange={(v) => update(i, { psychologyMode: v === "__none__" ? null : v as "semester" | "annual" })}
+                >
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Aucune —</SelectItem>
+                    <SelectItem value="semester">Semestre (10 séances)</SelectItem>
+                    <SelectItem value="annual">Année complète (20 séances)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Orthophonie (séances)">
+                <Select
+                  value={s.speechTherapyMode ?? "__none__"}
+                  onValueChange={(v) => update(i, { speechTherapyMode: v === "__none__" ? null : v as "semester" | "annual" })}
+                >
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Aucune —</SelectItem>
+                    <SelectItem value="semester">Semestre (10 séances)</SelectItem>
+                    <SelectItem value="annual">Année complète (20 séances)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </div>
+            {(s.clubs.length > 0 || s.psychologyMode || s.speechTherapyMode) && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-status-info/20">
+                {s.clubs.map((c) => {
+                  const opt = CLUB_OPTIONS.find((o) => o.qualifier === c);
+                  return (
+                    <Badge key={c} variant="outline" className="text-[9px]">
+                      <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                      {opt?.label ?? c}
+                    </Badge>
+                  );
+                })}
+                {s.psychologyMode && (
+                  <Badge variant="outline" className="text-[9px] text-status-info">
+                    <HeartPulse className="h-2.5 w-2.5 mr-0.5" />
+                    Psychologie ({s.psychologyMode === "annual" ? "annuel" : "semestre"})
+                  </Badge>
+                )}
+                {s.speechTherapyMode && (
+                  <Badge variant="outline" className="text-[9px] text-status-info">
+                    <Speech className="h-2.5 w-2.5 mr-0.5" />
+                    Orthophonie ({s.speechTherapyMode === "annual" ? "annuel" : "semestre"})
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ))}

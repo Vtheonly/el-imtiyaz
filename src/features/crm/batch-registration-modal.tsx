@@ -288,6 +288,7 @@ export function BatchRegistrationModal({
             setIncludeRegistration={setIncludeRegistration}
             includeTransport={includeTransport}
             setIncludeTransport={setIncludeTransport}
+            parent={parent}
           />
         )}
         {step === 4 && <Step4 parent={parent} students={students} billing={billing} />}
