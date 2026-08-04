@@ -9,9 +9,8 @@
  *   - Expense detail drawer with full workflow (Approve/Reject/Disburse/Settle)
  *   - Installment Schedule tab (replaces ComingSoonCard) with one-click collect
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
 import { Plus, Download, Filter, Search, Wallet, TrendingUp, AlertTriangle, Receipt, FileText, CreditCard, CalendarClock, AlertCircle, Send, FileCheck } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import { useAuth } from "../../app/providers/auth-provider";
@@ -41,53 +40,19 @@ import { ExpenseSubmitModal } from "./expense-submit-modal";
 import { ExpenseDetailDrawer } from "./expense-detail-drawer";
 import { InstallmentScheduleTab } from "./installment-schedule-tab";
 import { ReceiptsTab } from "./receipts-tab";
-import { CollapsiblePaymentRow } from "./collapsible-payment-row";
 
 export function FinancialsPage() {
   const { t } = useTranslation();
   const repos = useRepositories();
   const { session } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
   const payments = useObservable(() => repos.payments.observe(), []);
   const expenses = useObservable(() => repos.expenses.observe(), []);
   const debtSummary = useObservable(() => repos.debt.observeSummary(), []);
-
-  // Spec §1.1 / §1.5 / §3.2 — URL-driven payment modal presets.
-  // Any page can navigate to /financials?parentId=X&installmentId=Y&category=Z&amount=N&tab=payments
-  // to auto-open the CounterPaymentModal pre-filled with the debt context.
-  const presetParentId = searchParams.get("parentId");
-  const presetInstallmentId = searchParams.get("installmentId");
-  const presetCategory = searchParams.get("category");
-  const presetAmount = searchParams.get("amount");
-  const initialTab = searchParams.get("tab") ?? "payments";
-  const highlightPaymentId = searchParams.get("paymentId");
 
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [expenseDetailId, setExpenseDetailId] = useState<string | null>(null);
   const [expenseDetailOpen, setExpenseDetailOpen] = useState(false);
-
-  // Spec §1.5 — auto-open the CounterPaymentModal when a "Résoudre" shortcut
-  // passes parentId in the URL (with or without a specific installmentId).
-  useEffect(() => {
-    if (presetParentId && !paymentOpen) {
-      setPaymentOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presetParentId]);
-
-  // Clear the URL params after the modal opens so a refresh doesn't re-trigger.
-  function handlePaymentModalClose(open: boolean) {
-    setPaymentOpen(open);
-    if (!open && (presetParentId || presetInstallmentId)) {
-      const next = new URLSearchParams(searchParams);
-      next.delete("parentId");
-      next.delete("installmentId");
-      next.delete("category");
-      next.delete("amount");
-      setSearchParams(next, { replace: true });
-    }
-  }
 
   // Iteration 5: use shared helpers — no duplicated logic.
   const totalToday = sumPaidPayments(payments);
@@ -135,7 +100,7 @@ export function FinancialsPage() {
         </div>
       </div>
 
-      <PageTabs defaultValue={initialTab} className="flex-1 flex flex-col px-6 pb-6 min-h-0">
+      <PageTabs defaultValue="payments" className="flex-1 flex flex-col px-6 pb-6 min-h-0">
         <PageTabList>
           <PageTab value="payments" label="Paiements" icon={CreditCard} />
           <PageTab value="installments" label="Tranches" icon={CalendarClock} />
@@ -145,7 +110,7 @@ export function FinancialsPage() {
         </PageTabList>
 
         <PageTabContent value="payments">
-          <PaymentsTab highlightId={highlightPaymentId} />
+          <PaymentsTab />
         </PageTabContent>
         <PageTabContent value="installments">
           <InstallmentScheduleTab />
@@ -161,14 +126,7 @@ export function FinancialsPage() {
         </PageTabContent>
       </PageTabs>
 
-      <CounterPaymentModal
-        open={paymentOpen}
-        onOpenChange={handlePaymentModalClose}
-        presetParentId={presetParentId}
-        presetInstallmentId={presetInstallmentId}
-        presetCategory={presetCategory as never}
-        presetAmount={presetAmount ? Number(presetAmount) : null}
-      />
+      <CounterPaymentModal open={paymentOpen} onOpenChange={setPaymentOpen} />
       <ExpenseSubmitModal
         open={expenseOpen}
         onOpenChange={setExpenseOpen}
@@ -183,23 +141,9 @@ export function FinancialsPage() {
   );
 }
 
-function PaymentsTab({ highlightId }: { highlightId?: string | null }) {
+function PaymentsTab() {
   const repos = useRepositories();
   const payments = useObservable(() => repos.payments.observe(), []);
-  const parents = useObservable(() => repos.parents.observe(), []);
-
-  // Build a lookup of installmentId → label by aggregating each parent's
-  // installments. The InstallmentRepository only exposes per-parent observe,
-  // so we iterate the parent list (same pattern as InstallmentScheduleTab).
-  const installmentLabelMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const p of parents) {
-      const items = repos.installments.observeByParent(p.id).get();
-      for (const i of items) m.set(i.id, i.label);
-    }
-    return m;
-  }, [parents, repos.installments]);
-
   return (
     <Card>
       <CardContent className="p-0">
@@ -211,15 +155,26 @@ function PaymentsTab({ highlightId }: { highlightId?: string | null }) {
           <Button variant="outline" size="sm"><Filter className="h-4 w-4" /> Méthode</Button>
           <Button variant="outline" size="sm"><Download className="h-4 w-4" /></Button>
         </div>
-        {/* Spec §1.2 — Collapsible accordion rows for payment details */}
         <ul className="divide-y divide-border">
-          {payments.slice(0, 50).map((p) => (
-            <CollapsiblePaymentRow
-              key={p.id}
-              payment={p}
-              installmentLabel={p.installmentId ? installmentLabelMap.get(p.installmentId) : undefined}
-              defaultOpen={p.id === highlightId}
-            />
+          {payments.slice(0, 20).map((p) => (
+            <li key={p.id} className="flex items-center gap-3 p-3 hover:bg-accent/5">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-foreground font-mono">{p.receiptNumber}</p>
+                  <StatusChip
+                    label={PAYMENT_STATUS_LABELS_FR[p.status]}
+                    tone={p.status === "paid" ? "success" : p.status === "pending" ? "warning" : p.status === "overdue" ? "danger" : p.status === "refunded" ? "neutral" : "info"}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {PAYMENT_METHOD_LABELS_FR[p.method]} • {PAYMENT_CATEGORY_LABELS_FR[p.category]}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold tnum">{formatDzd(p.amount)}</p>
+                <p className="text-[10px] text-muted-foreground">{formatRelative(p.collectedAt)}</p>
+              </div>
+            </li>
           ))}
         </ul>
       </CardContent>

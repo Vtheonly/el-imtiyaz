@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Filter, Search, Download, Phone, MessageCircle, Mail, Eye, Users, GraduationCap, UserPlus, Calculator } from "lucide-react";
+import { Plus, Filter, Search, Download, Phone, MessageCircle, Mail, Eye, Users, GraduationCap, UserPlus, FileJson, FileSpreadsheet, Upload, ChevronDown } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import type { Parent } from "../../domain/model/parent";
 import type { Student } from "../../domain/model/student";
@@ -27,21 +27,29 @@ import { BatchRegistrationModal } from "./batch-registration-modal";
 import { ParentDetailDrawer } from "./parent-detail-drawer";
 import { StudentDetailDrawer } from "./student-detail-drawer";
 import { ExcelImportModal } from "./excel-import-modal";
-import { PreRegistrationSimulatorModal } from "./pre-registration-simulator-modal";
-import { FileSpreadsheet, Upload } from "lucide-react";
+import { useToast } from "../../app/providers/toast-provider";
+import {
+  exportToJson,
+  exportToXlsxFile,
+  exportStudentsToCsv,
+  type ExportData,
+} from "../../infrastructure/excel/data-export";
 
 export function CrmPage() {
   const { t } = useTranslation();
   const repos = useRepositories();
+  const toast = useToast();
   const parents = useObservable(() => repos.parents.observe(), []);
   const students = useObservable(() => repos.students.observe(), []);
+  const ledger = useObservable(() => repos.ledger.observe(), []);
   const [batchOpen, setBatchOpen] = useState(false);
   const [drawerParentId, setDrawerParentId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [studentDrawerId, setStudentDrawerId] = useState<string | null>(null);
   const [studentDrawerOpen, setStudentDrawerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   function openParent(parentId: string) {
     setDrawerParentId(parentId);
@@ -53,6 +61,58 @@ export function CrmPage() {
     setStudentDrawerOpen(true);
   }
 
+  function buildExportData(): ExportData {
+    return {
+      parents,
+      students,
+      ledger,
+      exportedAt: new Date().toISOString(),
+    };
+  }
+
+  async function handleExportXlsx() {
+    setExportMenuOpen(false);
+    setExporting(true);
+    try {
+      const fileName = await exportToXlsxFile(buildExportData());
+      toast.showSuccess(
+        "Export XLSX réussi",
+        `${parents.length} parent(s), ${students.length} élève(s), ${ledger.length} écriture(s) → ${fileName}`,
+      );
+    } catch (e) {
+      toast.showError("Échec de l'export XLSX", e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function handleExportJson() {
+    setExportMenuOpen(false);
+    try {
+      const fileName = `el-imtiyaz-export-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+      exportToJson(buildExportData(), fileName);
+      toast.showSuccess(
+        "Export JSON réussi",
+        `${parents.length} parent(s), ${students.length} élève(s), ${ledger.length} écriture(s) → ${fileName}`,
+      );
+    } catch (e) {
+      toast.showError("Échec de l'export JSON", e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function handleExportCsv() {
+    setExportMenuOpen(false);
+    try {
+      const fileName = exportStudentsToCsv(parents, students);
+      toast.showSuccess(
+        "Export CSV réussi",
+        `${students.length} élève(s) → ${fileName}`,
+      );
+    } catch (e) {
+      toast.showError("Échec de l'export CSV", e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader
@@ -60,14 +120,65 @@ export function CrmPage() {
         description="Gestion des parents et des élèves — inscription groupée 1→N, navigation bidirectionnelle"
         actions={
           <>
-            {/* Spec §2.2 — Pre-Registration Cost & Program Estimator */}
-            <Button variant="outline" size="sm" onClick={() => setSimulatorOpen(true)} title="Simulateur de devis pour prospects">
-              <Calculator className="h-4 w-4" /> Simulateur
-            </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" /> Import Excel
             </Button>
-            <Button variant="outline" size="sm"><Download className="h-4 w-4" /> {t("common.export")}</Button>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={exporting || students.length === 0}
+                onClick={() => setExportMenuOpen((v) => !v)}
+              >
+                <Download className="h-4 w-4" />
+                {exporting ? "Export…" : t("common.export")}
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+              {exportMenuOpen && (
+                <>
+                  {/* Click-away overlay */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setExportMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-md border border-border bg-popover shadow-md overflow-hidden">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent/10 text-left"
+                      onClick={handleExportXlsx}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 text-status-success" />
+                      <div>
+                        <p className="font-medium">Excel (.xlsx)</p>
+                        <p className="text-[10px] text-muted-foreground">4 feuilles : Résumé, Parents, Élèves, Journal</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent/10 text-left border-t border-border"
+                      onClick={handleExportJson}
+                    >
+                      <FileJson className="h-4 w-4 text-status-info" />
+                      <div>
+                        <p className="font-medium">JSON</p>
+                        <p className="text-[10px] text-muted-foreground">Format machine pour sauvegarde / re-import</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent/10 text-left border-t border-border"
+                      onClick={handleExportCsv}
+                    >
+                      <Download className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">CSV élèves</p>
+                        <p className="text-[10px] text-muted-foreground">Liste des élèves uniquement (compatible tableur)</p>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <Button size="sm" onClick={() => setBatchOpen(true)}>
               <Plus className="h-4 w-4" /> Nouvelle inscription
             </Button>
@@ -141,12 +252,6 @@ export function CrmPage() {
           // Note: in a future iteration we could pre-fill the parent step.
           void pid;
         }}
-        onOpenStudent={(studentId) => {
-          // Spec §3.1 — smooth transition from parent drawer to student drawer
-          // (no stacked dialogs: close parent first, then open student).
-          setDrawerOpen(false);
-          openStudent(studentId);
-        }}
       />
       <StudentDetailDrawer
         studentId={studentDrawerId}
@@ -163,11 +268,6 @@ export function CrmPage() {
         onImported={() => {
           // Optional: refresh lists — observable handles this automatically
         }}
-      />
-      <PreRegistrationSimulatorModal
-        open={simulatorOpen}
-        onOpenChange={setSimulatorOpen}
-        onStartRegistration={() => setBatchOpen(true)}
       />
     </div>
   );

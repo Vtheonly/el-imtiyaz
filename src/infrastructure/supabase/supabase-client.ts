@@ -15,8 +15,20 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const envSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Safe accessor for Vite env vars — `import.meta.env` only exists under Vite.
+// In Node scripts / tests, this returns undefined, which is the correct
+// fallback (no Supabase env vars configured).
+function readEnv(name: string): string | undefined {
+  try {
+    const env = (import.meta as { env?: Record<string, string | undefined> }).env;
+    return env?.[name];
+  } catch {
+    return undefined;
+  }
+}
+
+const envSupabaseUrl = readEnv("VITE_SUPABASE_URL");
+const envSupabaseAnonKey = readEnv("VITE_SUPABASE_ANON_KEY");
 
 /**
  * Read the Supabase URL + anon key from local config (Electron userData or
@@ -55,7 +67,7 @@ export const supabaseAnonKey = localConfig.anonKey ?? envSupabaseAnonKey;
  * Whether the Supabase adapter should be used instead of the mock layer.
  * Priority: local config > env var.
  */
-export const useSupabase = localConfig.useSupabase ?? (import.meta.env.VITE_USE_SUPABASE === "true");
+export const useSupabase = localConfig.useSupabase ?? (readEnv("VITE_USE_SUPABASE") === "true");
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // Only throw if Supabase is explicitly enabled

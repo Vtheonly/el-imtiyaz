@@ -17,18 +17,17 @@
  *     overdue alert generator (spec §6.3).
  */
 import { useState, useMemo, useEffect } from "react";
-import { Filter, Download, ChevronRight, Wallet, CalendarCog, RefreshCw, Zap, AlertTriangle, CalendarDays, Clock } from "lucide-react";
+import { Filter, Download, ChevronRight, Wallet, CalendarCog, RefreshCw, Zap, AlertTriangle } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import { useAuth } from "../../app/providers/auth-provider";
 import { useToast } from "../../app/providers/toast-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { formatDzd, formatDzdPlain } from "../../core/format/currency";
-import { formatDate, formatDateTime } from "../../core/format/date";
+import { formatDate } from "../../core/format/date";
 import {
   PAYMENT_CATEGORY_LABELS_FR,
   PAYMENT_STATUS_LABELS_FR,
   ACADEMIC_CYCLE_LABELS_FR,
-  resolveTranchePeriod,
   type AcademicCycle,
   type PaymentCategory,
   type Installment,
@@ -197,30 +196,6 @@ export function InstallmentScheduleTab() {
           <Total label="En retard" value={String(totals.overdueCount)} tone="warning" />
         </div>
 
-        {/* Spec §1.3 — Tranche → Semester → Month range legend */}
-        <div className="border-b border-border px-3 py-2 bg-status-info/5">
-          <div className="flex items-center gap-2 flex-wrap text-[10px]">
-            <span className="font-semibold text-status-info uppercase tracking-wide flex items-center gap-1">
-              <CalendarDays className="h-3 w-3" />
-              Correspondance Tranches / Semestres:
-            </span>
-            <span className="text-muted-foreground">
-              <Badge variant="outline" className="text-[9px] mr-1">Tranche 1</Badge>
-              = S1 · Sept–Oct–Nov
-            </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-muted-foreground">
-              <Badge variant="outline" className="text-[9px] mr-1">Tranche 2</Badge>
-              = S2 · Dec–Jan–Feb
-            </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-muted-foreground">
-              <Badge variant="outline" className="text-[9px] mr-1">Tranche 3</Badge>
-              = S3 · Mar–Apr–May
-            </span>
-          </div>
-        </div>
-
         {/* List */}
         <ul className="divide-y divide-border">
           {filtered.length === 0 ? (
@@ -231,126 +206,85 @@ export function InstallmentScheduleTab() {
             filtered.map((i) => {
               const remaining = i.amountDue - i.amountPaid;
               const canCollect = i.status !== "paid" && remaining > 0;
-              const period = resolveTranchePeriod(i);
-              const paidPercent = i.amountDue > 0 ? Math.round((i.amountPaid / i.amountDue) * 100) : 0;
               return (
                 <li
                   key={i.id}
-                  className="p-3 hover:bg-accent/5"
+                  className="flex items-center gap-3 p-3 hover:bg-accent/5"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium truncate">{i.parentName}</p>
-                        <Badge variant="outline" className="text-[10px]">{i.label}</Badge>
-                        {/* Spec §1.3 — Semester badge */}
-                        {period.semester && (
-                          <Badge variant="outline" className="text-[9px] text-status-info bg-status-info/10">
-                            <CalendarDays className="h-2.5 w-2.5 mr-0.5" />
-                            S{period.semester}
-                          </Badge>
-                        )}
-                        <span className="text-[10px] text-muted-foreground">{PAYMENT_CATEGORY_LABELS_FR[i.category]}</span>
-                        {/* Iteration 9 — badges for cycle + custom schedule */}
-                        {i.academicCycle && (
-                          <Badge variant="outline" className="text-[9px] text-muted-foreground">
-                            {ACADEMIC_CYCLE_LABELS_FR[i.academicCycle]}
-                          </Badge>
-                        )}
-                        {i.customSchedule && (
-                          <Badge variant="outline" className="text-[9px] text-status-warning bg-status-warning/10">
-                            Personnalisé
-                          </Badge>
-                        )}
-                        {i.status === "overdue" && (
-                          <Badge variant="outline" className="text-[9px] text-status-danger bg-status-danger/10">
-                            <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
-                            Alerte auto
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" />
-                          Échéance: {formatDate(i.dueDate)}
-                        </span>
-                        {/* Spec §1.3 — covered months range */}
-                        {period.months && (
-                          <span className="inline-flex items-center gap-1 text-status-info">
-                            <CalendarDays className="h-3 w-3" />
-                            {period.months}
-                          </span>
-                        )}
-                        {/* Spec §1.3 — paid timestamp with exact date/time */}
-                        {i.paidDate && (
-                          <span className="inline-flex items-center gap-1 text-status-success">
-                            <Clock className="h-3 w-3" />
-                            Payée: {formatDateTime(i.paidDate)}
-                          </span>
-                        )}
-                        {i.customScheduleNote && <span>· {i.customScheduleNote}</span>}
-                      </p>
-                      {/* Spec §1.4 — partial payment progress bar */}
-                      {i.status === "partial" && i.amountDue > 0 && (
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden max-w-[200px]">
-                            <div
-                              className="h-full rounded-full bg-status-warning"
-                              style={{ width: `${paidPercent}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] font-mono text-muted-foreground">
-                            {paidPercent}% · {formatDzdPlain(i.amountPaid)} / {formatDzdPlain(i.amountDue)}
-                          </span>
-                        </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate">{i.parentName}</p>
+                      <Badge variant="outline" className="text-[10px]">{i.label}</Badge>
+                      <span className="text-[10px] text-muted-foreground">{PAYMENT_CATEGORY_LABELS_FR[i.category]}</span>
+                      {/* Iteration 9 — badges for cycle + custom schedule */}
+                      {i.academicCycle && (
+                        <Badge variant="outline" className="text-[9px] text-muted-foreground">
+                          {ACADEMIC_CYCLE_LABELS_FR[i.academicCycle]}
+                        </Badge>
+                      )}
+                      {i.customSchedule && (
+                        <Badge variant="outline" className="text-[9px] text-status-warning bg-status-warning/10">
+                          Personnalisé
+                        </Badge>
+                      )}
+                      {i.status === "overdue" && (
+                        <Badge variant="outline" className="text-[9px] text-status-danger bg-status-danger/10">
+                          <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
+                          Alerte auto
+                        </Badge>
                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-mono">{formatDzdPlain(remaining)}</p>
-                      <p className="text-[10px] text-muted-foreground">restant</p>
-                    </div>
-                    <StatusChip
-                      label={PAYMENT_STATUS_LABELS_FR[i.status as keyof typeof PAYMENT_STATUS_LABELS_FR] ?? i.status}
-                      tone={
-                        i.status === "paid"
-                          ? "success"
-                          : i.status === "partial"
-                            ? "warning"
-                            : i.status === "overdue"
-                              ? "danger"
-                              : "info"
-                      }
-                    />
-                    {/* Iteration 9 — edit due date action (per-parent flexible schedule) */}
-                    {i.status !== "paid" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        title="Modifier l'échéance (échelonnement personnalisé)"
-                        onClick={() => setEditDueDateFor(i)}
-                      >
-                        <CalendarCog className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {canCollect && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setCollectFor({
-                            parentId: i.parentId,
-                            installmentId: i.id,
-                            amount: remaining,
-                            category: i.category,
-                          })
-                        }
-                      >
-                        <Wallet className="h-3.5 w-3.5" /> Encaisser
-                        <ChevronRight className="h-3 w-3" />
-                      </Button>
-                    )}
+                    <p className="text-[11px] text-muted-foreground">
+                      Échéance: {formatDate(i.dueDate)}
+                      {i.paidDate && ` · Payée: ${formatDate(i.paidDate)}`}
+                      {i.customScheduleNote && ` · ${i.customScheduleNote}`}
+                    </p>
                   </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono">{formatDzdPlain(remaining)}</p>
+                    <p className="text-[10px] text-muted-foreground">restant</p>
+                  </div>
+                  <StatusChip
+                    label={PAYMENT_STATUS_LABELS_FR[i.status as keyof typeof PAYMENT_STATUS_LABELS_FR] ?? i.status}
+                    tone={
+                      i.status === "paid"
+                        ? "success"
+                        : i.status === "partial"
+                          ? "warning"
+                          : i.status === "overdue"
+                            ? "danger"
+                            : "info"
+                    }
+                  />
+                  {/* Iteration 9 — edit due date action (per-parent flexible schedule) */}
+                  {i.status !== "paid" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Modifier l'échéance (échelonnement personnalisé)"
+                      onClick={() => setEditDueDateFor(i)}
+                    >
+                      <CalendarCog className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {canCollect && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCollectFor({
+                          parentId: i.parentId,
+                          installmentId: i.id,
+                          amount: remaining,
+                          category: i.category,
+                        })
+                      }
+                    >
+                      <Wallet className="h-3.5 w-3.5" /> Encaisser
+                      <ChevronRight className="h-3 w-3" />
+                    </Button>
+                  )}
                 </li>
               );
             })

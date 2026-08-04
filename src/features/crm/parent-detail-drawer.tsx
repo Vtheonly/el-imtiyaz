@@ -13,7 +13,6 @@
  * (matching `student-detail-drawer.tsx`).
  */
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Phone,
   MessageCircle,
@@ -25,11 +24,6 @@ import {
   AlertTriangle,
   Users,
   Download,
-  Zap,
-  ArrowRight,
-  CalendarDays,
-  Clock,
-  ChevronRight,
 } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import { useToast } from "../../app/providers/toast-provider";
@@ -45,35 +39,28 @@ import { MoneyInput } from "../../shared/ui/money-input";
 import { FormField } from "../../shared/ui/form-field";
 import { Textarea } from "../../shared/ui/textarea";
 import { formatDzd, formatDzdPlain } from "../../core/format/currency";
-import { formatRelative, formatDate, formatDateTime } from "../../core/format/date";
+import { formatRelative, formatDate } from "../../core/format/date";
 import {
   PAYMENT_METHOD_LABELS_FR,
   PAYMENT_STATUS_LABELS_FR,
   PAYMENT_CATEGORY_LABELS_FR,
-  resolveTranchePeriod,
-  type Installment,
 } from "../../domain/model/payment";
 import { Permission } from "../../core/rbac/permissions";
 import { generateAccountStatementPdf, downloadPdf } from "../../infrastructure/receipt-pdf";
-import { CollapsiblePaymentRow } from "../financials/collapsible-payment-row";
 
 export function ParentDetailDrawer({
   parentId,
   open,
   onOpenChange,
   onAddChild,
-  onOpenStudent,
 }: {
   parentId: string | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onAddChild?: (parentId: string) => void;
-  /** Spec §3.1 — open the child's student drawer from within the parent drawer. */
-  onOpenStudent?: (studentId: string) => void;
 }) {
   const repos = useRepositories();
   const toast = useToast();
-  const navigate = useNavigate();
   const parent = useObservable(
     () => repos.parents.observeById(parentId ?? ""),
     [parentId],
@@ -96,31 +83,6 @@ export function ParentDetailDrawer({
   const initials = `${parent.firstName[0] ?? ""}${parent.lastName[0] ?? ""}`.toUpperCase();
   const outstanding = financialProfile?.totalOutstanding ?? 0;
   const overdue = financialProfile?.overdueAmount ?? 0;
-
-  /**
-   * Spec §1.5 — "Résoudre / Solver" direct settlement shortcut.
-   *
-   * Navigates to /financials with URL params that auto-open the
-   * CounterPaymentModal pre-filled with the parent + oldest overdue
-   * installment. This eliminates the manual search-and-find flow.
-   */
-  function handleResolveDebt(installment?: Installment) {
-    const params = new URLSearchParams();
-    params.set("parentId", parent!.id);
-    if (installment) {
-      params.set("installmentId", installment.id);
-      params.set("category", installment.category);
-      params.set("amount", String(installment.amountDue - installment.amountPaid));
-    }
-    params.set("tab", "payments");
-    onOpenChange(false);
-    navigate(`/financials?${params.toString()}`);
-  }
-
-  // Find the oldest overdue/pending installment for the "Résoudre" button.
-  const oldestUnpaidInstallment = financialProfile?.installments
-    .filter((i) => i.status !== "paid" && i.amountDue - i.amountPaid > 0)
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
 
   // Iteration 6: Wire up the "Reçu PDF" button — generates a full account
   // statement PDF for the parent and triggers a browser download.
@@ -163,17 +125,6 @@ export function ParentDetailDrawer({
       footer={
         <>
           <AdjustAccountButton parentId={parent.id} outstanding={outstanding} />
-          {/* Spec §1.5 — "Résoudre / Solver" direct settlement shortcut */}
-          {outstanding > 0 && (
-            <Button
-              variant="default"
-              onClick={() => handleResolveDebt(oldestUnpaidInstallment)}
-              title="Résoudre la créance — ouvrir le module financier pré-rempli"
-              className="bg-status-danger hover:bg-status-danger/90"
-            >
-              <Zap className="h-4 w-4" /> Résoudre {formatDzd(outstanding, { compact: true })}
-            </Button>
-          )}
           <div className="ml-auto flex items-center gap-1.5">
             <Button variant="outline" size="icon" title="Appeler" onClick={() => window.open(`tel:${parent.phone}`)}>
               <Phone className="h-4 w-4" />
@@ -242,9 +193,7 @@ export function ParentDetailDrawer({
               {students.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center gap-3 rounded-md border border-border p-2.5 hover:bg-accent/5 cursor-pointer group"
-                  onClick={() => onOpenStudent?.(s.id)}
-                  title={`Ouvrir le profil de ${s.firstName}`}
+                  className="flex items-center gap-3 rounded-md border border-border p-2.5 hover:bg-accent/5"
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="text-xs">
@@ -253,7 +202,7 @@ export function ParentDetailDrawer({
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                    <p className="text-sm font-medium truncate">
                       {s.firstName} {s.lastName}
                     </p>
                     <p className="text-[11px] text-muted-foreground font-mono">{s.code}</p>
@@ -265,8 +214,6 @@ export function ParentDetailDrawer({
                     label={s.status === "active" ? "Actif" : s.status}
                     tone={s.status === "active" ? "success" : "neutral"}
                   />
-                  {/* Spec §3.1 — clickable child name transitions to student drawer */}
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                 </li>
               ))}
             </ul>
@@ -297,96 +244,59 @@ export function ParentDetailDrawer({
 
           {/* Installments (tranches) */}
           <div className="rounded-md border border-border">
-            <div className="border-b border-border px-3 py-1.5 bg-muted/30 flex items-center justify-between">
+            <div className="border-b border-border px-3 py-1.5 bg-muted/30">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Tranches
               </p>
-              <span className="text-[9px] text-muted-foreground">
-                T1=S1 Sept–Nov · T2=S2 Dec–Feb · T3=S3 Mar–May
-              </span>
             </div>
             {financialProfile && financialProfile.installments.length > 0 ? (
               <ul className="divide-y divide-border text-xs">
-                {financialProfile.installments.map((i) => {
-                  const period = resolveTranchePeriod(i);
-                  const remaining = i.amountDue - i.amountPaid;
-                  const canResolve = i.status !== "paid" && remaining > 0;
-                  return (
-                    <li key={i.id} className="px-3 py-2 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{i.label}</span>
-                        {/* Spec §1.3 — semester + covered months badges */}
-                        {period.semester && (
-                          <Badge variant="outline" className="text-[9px] text-status-info bg-status-info/10">
-                            S{period.semester}
-                          </Badge>
-                        )}
-                        {period.months && (
-                          <span className="text-[10px] text-status-info">{period.months}</span>
-                        )}
-                        <span className="text-muted-foreground">{PAYMENT_CATEGORY_LABELS_FR[i.category]}</span>
-                        <span className="ml-auto font-mono">{formatDzdPlain(i.amountDue)}</span>
-                        <span className="text-muted-foreground">→ {formatDate(i.dueDate)}</span>
-                        <StatusChip
-                          label={PAYMENT_STATUS_LABELS_FR[i.status]}
-                          tone={
-                            i.status === "paid"
-                              ? "success"
-                              : i.status === "partial"
-                                ? "warning"
-                                : i.status === "overdue"
-                                  ? "danger"
-                                  : "neutral"
-                          }
-                        />
-                      </div>
-                      {/* Spec §1.3 — paid timestamp with exact date/time */}
-                      {i.paidDate && (
-                        <p className="text-[10px] text-status-success flex items-center gap-1 pl-1">
-                          <Clock className="h-2.5 w-2.5" />
-                          Payée le {formatDateTime(i.paidDate)}
-                        </p>
-                      )}
-                      {/* Spec §1.5 — per-tranche "Résoudre" shortcut for overdue/unpaid */}
-                      {canResolve && (
-                        <button
-                          type="button"
-                          onClick={() => handleResolveDebt(i)}
-                          className="text-[10px] text-status-danger hover:text-status-danger/80 hover:underline flex items-center gap-1 pl-1"
-                        >
-                          <Zap className="h-2.5 w-2.5" />
-                          Résoudre cette tranche ({formatDzdPlain(remaining)})
-                          <ArrowRight className="h-2.5 w-2.5" />
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
+                {financialProfile.installments.map((i) => (
+                  <li key={i.id} className="flex items-center gap-2 px-3 py-2">
+                    <span className="font-medium">{i.label}</span>
+                    <span className="text-muted-foreground">{PAYMENT_CATEGORY_LABELS_FR[i.category]}</span>
+                    <span className="ml-auto font-mono">{formatDzdPlain(i.amountDue)}</span>
+                    <span className="text-muted-foreground">→ {formatDate(i.dueDate)}</span>
+                    <StatusChip
+                      label={PAYMENT_STATUS_LABELS_FR[i.status]}
+                      tone={
+                        i.status === "paid"
+                          ? "success"
+                          : i.status === "partial"
+                            ? "warning"
+                            : i.status === "overdue"
+                              ? "danger"
+                              : "neutral"
+                      }
+                    />
+                  </li>
+                ))}
               </ul>
             ) : (
               <p className="px-3 py-3 text-xs text-muted-foreground">Aucune tranche.</p>
             )}
           </div>
 
-          {/* Recent payments — Spec §1.2: collapsible accordion rows */}
+          {/* Recent payments */}
           <div className="rounded-md border border-border">
             <div className="border-b border-border px-3 py-1.5 bg-muted/30">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Paiements récents (cliquer pour détails)
+                Paiements récents
               </p>
             </div>
             {financialProfile && financialProfile.recentPayments.length > 0 ? (
-              <ul className="divide-y divide-border">
-                {financialProfile.recentPayments.slice(0, 8).map((p) => (
-                  <CollapsiblePaymentRow
-                    key={p.id}
-                    payment={p}
-                    installmentLabel={
-                      p.installmentId
-                        ? financialProfile.installments.find((i) => i.id === p.installmentId)?.label
-                        : undefined
-                    }
-                  />
+              <ul className="divide-y divide-border text-xs">
+                {financialProfile.recentPayments.slice(0, 5).map((p) => (
+                  <li key={p.id} className="flex items-center gap-2 px-3 py-2">
+                    <code className="font-mono text-[10px] text-muted-foreground">{p.receiptNumber}</code>
+                    <span className="text-muted-foreground">{PAYMENT_METHOD_LABELS_FR[p.method]}</span>
+                    <span className="ml-auto font-mono">{formatDzdPlain(p.amount)}</span>
+                    <span className="text-muted-foreground">{formatRelative(p.collectedAt)}</span>
+                    <StatusChip
+                      label={PAYMENT_STATUS_LABELS_FR[p.status]}
+                      tone={p.status === "paid" ? "success" : p.status === "pending" ? "warning" : "neutral"}
+                    />
+                  </li>
                 ))}
               </ul>
             ) : (

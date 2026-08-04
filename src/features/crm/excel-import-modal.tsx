@@ -57,22 +57,16 @@ export function ExcelImportModal({
   const sync = useSyncActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const engineRef = useRef<ImportEngine | null>(null);
-  /**
-   * Persist the selected File object across stages.
-   *
-   * The previous implementation re-read `fileInputRef.current?.files` during
-   * `commit()`, but in Electron and some browsers the FileList becomes stale
-   * (null/empty) after the first read — especially after the dry-run parse
-   * triggers re-renders. This caused the false "Fichier introuvable" error
-   * even though the import engine had already processed the file.
-   *
-   * Stashing the File in a ref on selection guarantees `commit()` can always
-   * re-read the bytes for the real (non-dry-run) import.
-   */
-  const fileRef = useRef<File | null>(null);
 
   const [stage, setStage] = useState<Stage>("select");
   const [fileName, setFileName] = useState<string | null>(null);
+  // Keep the File object in component state so the commit() step can re-read
+  // the bytes without relying on the <input type="file"> ref. The ref is
+  // unreliable across React re-renders: when the modal transitions from the
+  // "select" stage to the "preview" stage, the input element is unmounted,
+  // which empties `fileInputRef.current.files` and causes the
+  // "Fichier introuvable" error reported in production.
+  const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const [previewCtx, setPreviewCtx] = useState<ImportContext | null>(null);
   const [parsing, setParsing] = useState(false);
   const [commitCtx, setCommitCtx] = useState<ImportContext | null>(null);
@@ -82,12 +76,13 @@ export function ExcelImportModal({
   function reset() {
     setStage("select");
     setFileName(null);
+    setFileBytes(null);
     setPreviewCtx(null);
     setCommitCtx(null);
     setReports(null);
     setAlert(null);
-    fileRef.current = null;
-    // Clear the input so re-selecting the same file fires onChange again.
+    // Clear the underlying input so re-opening the modal lets the user pick
+    // the same file again (the input's `change` event won't fire otherwise).
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -132,18 +127,22 @@ export function ExcelImportModal({
   async function handleFile(file: File) {
     setParsing(true);
     setAlert(null);
-    // Stash the File so commit() can re-read it without relying on the
-    // input element's (stale) FileList. See fileRef docs above.
-    fileRef.current = file;
     try {
+      // Read the bytes ONCE here and stash them in component state so the
+      // commit() step can re-use them without depending on the file input.
+      // The File object itself is also fine to keep, but Uint8Array is
+      // plain serializable memory that survives any React re-render.
+      const buf = new Uint8Array(await file.arrayBuffer());
+      setFileBytes(buf);
+      setFileName(file.name);
+
       const engine = getEngine();
       // Dry-run import — validates + shows stats without writing to storage.
-      const ctx = await engine.importFile(file, file.name, {
+      const ctx = await engine.importFile(buf, file.name, {
         dryRun: true,
         source: { user: session?.email ?? "unknown" },
       });
       setPreviewCtx(ctx);
-      setFileName(file.name);
       setStage("preview");
 
       if (ctx.stats.rowsRead === 0) {
@@ -178,18 +177,24 @@ export function ExcelImportModal({
 
   async function commit() {
     if (!previewCtx || !session) return;
+    if (!fileBytes || !fileName) {
+      // Should never happen — handleFile() populates both before enabling
+      // commit — but guard anyway so the user sees a clear message instead
+      // of a generic crash.
+      setStage("preview");
+      setAlert({
+        tone: "error",
+        title: "Fichier introuvable",
+        description:
+          "Le fichier source n'est plus en mémoire. Veuillez fermer cette fenêtre, rouvrir l'import et recharger le fichier .xlsx.",
+      });
+      return;
+    }
     setStage("committing");
     setAlert(null);
     try {
-      // Use the stashed File from the selection stage. This avoids the
-      // "Fichier introuvable" error that occurred when the input element's
-      // FileList became stale between the dry-run and the real import.
-      const file = fileRef.current;
-      if (!file) {
-        throw new Error("Fichier introuvable — veuillez le recharger.");
-      }
       const engine = getEngine();
-      const ctx = await engine.importFile(file, file.name, {
+      const ctx = await engine.importFile(fileBytes, fileName, {
         dryRun: false,
         source: { user: session?.email ?? "unknown" },
       });
@@ -211,7 +216,7 @@ export function ExcelImportModal({
           // Excel import = real data → isMock: false. The sync layer
           // will push this to Supabase as soon as the desktop is online.
           isMock: false,
-          sourceFile: file.name,
+          sourceFile: fileName,
           importRunId: ctx.runId,
         });
         enqueuedForSync++;

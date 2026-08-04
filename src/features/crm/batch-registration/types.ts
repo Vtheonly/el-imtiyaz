@@ -31,20 +31,6 @@ export interface Step2Student {
   gradeYear: number;
   transportTier: CityTier | "";
   medicalNotes: string;
-  /**
-   * Spec §2.3 — specialized programs selection.
-   *
-   * Each student can enroll in extracurricular clubs (chess, English, sports,
-   * arts) and complementary therapy services (psychology, speech therapy /
-   * orthophonie). These are billed on top of tuition + transport.
-   *
-   * `clubs` is a list of additional-service qualifiers (e.g. "chess_club").
-   * `psychologyMode` / `speechTherapyMode` select the billing cadence
-   * ("semester" | "annual" | null = not enrolled).
-   */
-  clubs: string[];
-  psychologyMode: "semester" | "annual" | null;
-  speechTherapyMode: "semester" | "annual" | null;
 }
 
 export const EMPTY_PARENT: Step1Parent = {
@@ -69,9 +55,6 @@ export const EMPTY_STUDENT: Step2Student = {
   gradeYear: 1,
   transportTier: "",
   medicalNotes: "",
-  clubs: [],
-  psychologyMode: null,
-  speechTherapyMode: null,
 };
 
 export const PHONE_RE = /^[+]?[0-9\s]{8,15}$/;

@@ -39,14 +39,24 @@ const DEV_TICK_MS = 5 * 60 * 1000;
  *                  out and back in as a different user).
  * @returns An unsubscribe function that clears the interval.
  */
+// Detect dev mode safely (see core/logger.ts for the same pattern).
+function readDevFlag(): boolean {
+  try {
+    return Boolean((import.meta as { env?: { DEV?: boolean } }).env?.DEV);
+  } catch {
+    return false;
+  }
+}
+
 export function startBackupScheduler(
   repos: Repositories,
   getActor: () => SchedulerActor | null,
 ): () => void {
-  const tickMs = import.meta.env.DEV ? DEV_TICK_MS : PROD_TICK_MS;
+  const isDev = readDevFlag();
+  const tickMs = isDev ? DEV_TICK_MS : PROD_TICK_MS;
   logger.info("backup.scheduler.start", {
     tickMs,
-    mode: import.meta.env.DEV ? "dev" : "prod",
+    mode: isDev ? "dev" : "prod",
   });
 
   const handle = setInterval(async () => {

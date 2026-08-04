@@ -49,8 +49,20 @@ function redact(value: unknown, depth = 0): unknown {
   return out;
 }
 
+// Detect development mode safely — `import.meta.env` only exists under Vite.
+// In other contexts (Node scripts, tests run via tsx/vitest without Vite
+// globals, plain CommonJS consumers) the optional chaining returns
+// `undefined`, which is falsy, so the logger defaults to "info".
+function readDevFlag(): boolean {
+  try {
+    return Boolean((import.meta as { env?: { DEV?: boolean } }).env?.DEV);
+  } catch {
+    return false;
+  }
+}
+
 class Logger {
-  private minLevel: LogLevel = import.meta.env.DEV ? "trace" : "info";
+  private minLevel: LogLevel = readDevFlag() ? "trace" : "info";
 
   setLevel(level: LogLevel): void {
     this.minLevel = level;
