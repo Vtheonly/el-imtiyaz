@@ -58,6 +58,7 @@ import type { TransportDestination } from "../model/parent";
 import type { Workflow, WorkflowRun, WorkflowTriggerType } from "../model/workflow";
 import type { BackupArchive, BackupRestoreResult } from "../model/backup";
 import type { AIProviderConfig, AIProvider, AIRequest, AIResponse } from "../model/ai";
+import type { PromotionRepository } from "./academic-repository";
 
 /** Minimal Observable<T> contract — glues mock/supabase reactive reads to React. */
 export type Subscriber<T> = (value: T) => void;
@@ -121,8 +122,9 @@ export interface SubjectRepository {
 
 export interface GradeRepository {
   observeForStudent(studentId: string): Observable<Assessment[]>;
-  observeForClass(classId: string): Observable<Assessment[]>;
+  observeForClass(classId: string, academicYear?: string, term?: string): Observable<Assessment[]>;
   enterGrade(input: Omit<Assessment, "id" | "subjectAverage" | "enteredAt">): Promise<Result<Assessment>>;
+  enterGradesBatch(inputs: ReadonlyArray<Omit<Assessment, "id" | "subjectAverage" | "enteredAt">>): Promise<Result<Assessment[]>>;
 }
 
 export interface AttendanceRepository {

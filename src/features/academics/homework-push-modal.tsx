@@ -1,26 +1,24 @@
-/**
- * HomeworkPushModal — teacher creates an assignment and pushes it to students.
- *
- * Plan §06: form with subject dropdown, title, description, due date,
- * attachments. On submit, fires push notification to parents via Web Portal.
- *
- * Iteration 3: refactored to use UnifiedModal — consistent header, footer,
- * loading state, error display, and animation with every other modal.
- * Attachments are mock (just file name capture) per iteration-2 scope.
- */
 import { useState } from "react";
 import { Send, Upload, X, BookOpen } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
 import { useToast } from "../../app/providers/toast-provider";
 import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
-import { UnifiedModal, type UnifiedModalProps } from "../../shared/ui/unified-modal";
+import {
+  UnifiedModal,
+  type UnifiedModalProps,
+} from "../../shared/ui/unified-modal";
 import { Button } from "../../shared/ui/button";
 import { Input } from "../../shared/ui/input";
 import { Textarea } from "../../shared/ui/textarea";
 import { FormField } from "../../shared/ui/form-field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
-import { toIsoDay } from "../../core/format/date";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../shared/ui/select";
 
 type Alert = NonNullable<UnifiedModalProps["alert"]>;
 
@@ -36,13 +34,15 @@ export function HomeworkPushModal({
   const repos = useRepositories();
   const toast = useToast();
   const { session } = useAuth();
+
   const classes = useObservable(() => repos.classes.observe(), []);
+  const subjects = useObservable(() => repos.subjects.observe(), []);
 
   const [classId, setClassId] = useState(presetClassId ?? "");
   const [subjectId, setSubjectId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState(toIsoDay());
+  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [attachments, setAttachments] = useState<string[]>([]);
   const [alert, setAlert] = useState<Alert | null>(null);
 
@@ -50,7 +50,7 @@ export function HomeworkPushModal({
     setSubjectId("");
     setTitle("");
     setDescription("");
-    setDueDate(toIsoDay());
+    setDueDate(new Date().toISOString().slice(0, 10));
     setAttachments([]);
     setAlert(null);
   }
@@ -60,13 +60,15 @@ export function HomeworkPushModal({
     if (!classId || !subjectId || !title.trim()) {
       setAlert({
         tone: "warning",
-        title: "Champs invalides",
-        description: "Classe, matière et titre sont requis.",
+        title: "Champs requis",
+        description: "Veuillez spécifier la classe, la matière et le titre.",
       });
       return;
     }
-    const subject = repos.subjects.observe().get().find((s) => s.id === subjectId);
-    const r = await repos.homework.push({
+
+    const selectedSubject = subjects.find((s) => s.id === subjectId);
+
+    const result = await repos.homework.push({
       classId,
       subjectId,
       teacherId: session.userId,
@@ -76,18 +78,19 @@ export function HomeworkPushModal({
       dueDate,
       attachments,
     });
-    if (r.ok) {
+
+    if (result.ok) {
       toast.showSuccess(
         "Devoir diffusé",
-        `Notification push envoyée aux parents/élèves (${subject?.name ?? "matière"}).`,
+        `Le devoir de ${selectedSubject?.name ?? "matière"} a été envoyé au portail web.`,
       );
       onOpenChange(false);
-      setTimeout(reset, 200);
+      reset();
     } else {
       setAlert({
         tone: "error",
         title: "Échec de la diffusion",
-        description: r.error.userMessage,
+        description: result.error.userMessage,
       });
     }
   }
@@ -101,8 +104,8 @@ export function HomeworkPushModal({
       icon={BookOpen}
       iconTone="primary"
       title="Diffuser un devoir"
-      description="Le devoir sera poussé vers le portail web parent/élève avec notification."
-      submitLabel="Diffuser"
+      description="Le devoir sera publié sur le portail web des élèves et notifié aux parents."
+      submitLabel="Diffuser au portail"
       submitIcon={Send}
       onSubmit={submit}
       alert={alert}
@@ -112,71 +115,94 @@ export function HomeworkPushModal({
         <div className="grid gap-3 md:grid-cols-2">
           <FormField label="Classe" required>
             <Select value={classId} onValueChange={setClassId}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner la classe…" />
+              </SelectTrigger>
               <SelectContent>
                 {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </FormField>
+
           <FormField label="Matière" required>
             <Select value={subjectId} onValueChange={setSubjectId}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner la matière…" />
+              </SelectTrigger>
               <SelectContent>
-                {repos.subjects.observe().get().map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                {subjects.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} ({s.code})
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </FormField>
         </div>
 
-        <FormField label="Titre" required>
+        <FormField label="Titre du devoir" required>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Lecture chapitre 3 + exercices"
+            placeholder="Exercices 1 à 5 page 42 — Fractions"
           />
         </FormField>
 
-        <FormField label="Description">
+        <FormField label="Instructions & Consignes">
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Lire pages 24-32, faire exercices 1 à 5."
+            placeholder="Résoudre les exercices sur le cahier de devoirs. Rendu obligatoire."
             rows={4}
           />
         </FormField>
 
-        <FormField label="Date d'échéance" required>
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        <FormField label="Date limite de rendu" required>
+          <Input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
         </FormField>
 
-        <FormField label="Pièces jointes" hint="Images, PDF, photos tableau">
+        <FormField label="Pièces jointes (PDF / Photos tableau)">
           <label className="flex items-center gap-2 rounded-md border border-dashed border-border p-3 cursor-pointer hover:bg-accent/5">
             <Upload className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Téléverser un fichier</span>
+            <span className="text-xs text-muted-foreground">
+              Ajouter des documents ou photos
+            </span>
             <input
               type="file"
               multiple
               className="hidden"
               onChange={(e) => {
                 const files = Array.from(e.target.files ?? []);
-                setAttachments((curr) => [...curr, ...files.map((f) => `mock://attachments/${f.name}`)]);
+                setAttachments((prev) => [
+                  ...prev,
+                  ...files.map((f) => f.name),
+                ]);
               }}
             />
           </label>
           {attachments.length > 0 && (
             <ul className="mt-2 space-y-1">
-              {attachments.map((a, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs">
-                  <span className="font-mono text-muted-foreground flex-1 truncate">{a}</span>
+              {attachments.map((fileName, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-center justify-between text-xs border border-border p-1.5 rounded"
+                >
+                  <span className="truncate">{fileName}</span>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-5 w-5"
-                    onClick={() => setAttachments((curr) => curr.filter((_, idx) => idx !== i))}
+                    onClick={() =>
+                      setAttachments((prev) => prev.filter((_, i) => i !== idx))
+                    }
                   >
                     <X className="h-3 w-3" />
                   </Button>

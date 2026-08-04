@@ -1,27 +1,12 @@
-/**
- * Mock academic repositories — Classes, Subjects, Grades, Attendance, Homework.
- *
- * Extracted from `mock-repositories.ts` in iteration 2 of the platform-wide
- * refactor. Behavior preserved verbatim — including the iteration 6 fixes
- * that made observe* methods return real seeded data instead of empty arrays.
- *
- * These 5 repositories are grouped in a single file because:
- *   1. They share the same domain (academics) and many of the same imports.
- *   2. They are read-mostly repositories with no cross-entity write logic.
- *   3. The original file grouped them under a single "// Classes & Subjects"
- *      section header.
- *
- * File length (~270 lines) is within the 100-300 line target for tightly
- * cohesive module groups.
- */
 import type {
   ClassRepository,
   SubjectRepository,
   GradeRepository,
   AttendanceRepository,
   HomeworkRepository,
-  Observable,
-} from "../../../domain/repository/repository";
+  PromotionRepository,
+} from "../../../domain/repository/academic-repository";
+import type { Observable } from "../../../domain/repository/repository";
 import type { Result } from "../../../core/result";
 import { Ok, Err } from "../../../core/result";
 import { Errors } from "../../../core/app-error";
@@ -38,30 +23,38 @@ import type {
   AttendanceSession,
   AttendanceStatus,
 } from "../../../domain/model/academic";
+import type { Student, AcademicLevel } from "../../../domain/model/student";
+import type { PromotionCandidate } from "../../../domain/calc/academics/promotion";
 import { store, TENANT_ID, appendAudit, nowIso, delay } from "./mock-store";
 import { ACADEMIC_YEAR } from "../seed-data";
 
 // ============================================================================
-// Classes
+// Classes (Unlimited creation per grade level, zero capacity limits)
 // ============================================================================
-
 export class MockClassRepository implements ClassRepository {
   observe(): Observable<AcademicClass[]> {
     return store.classes$;
   }
-  observeByLevel(level: string): Observable<AcademicClass[]> {
+  observeByLevel(level: AcademicLevel): Observable<AcademicClass[]> {
     return new SubjectBehavior(store.classes.filter((c) => c.level === level));
   }
   observeById(id: string): Observable<AcademicClass | null> {
     return new SubjectBehavior(store.classes.find((c) => c.id === id) ?? null);
   }
-  async createClass(input: Omit<AcademicClass, "id" | "tenantId" | "enrolledCount">): Promise<Result<AcademicClass>> {
+  async createClass(
+    input: Omit<
+      AcademicClass,
+      "id" | "tenantId" | "enrolledCount" | "isActive"
+    >,
+  ): Promise<Result<AcademicClass>> {
     await delay(200);
     const cls: AcademicClass = {
       ...input,
       id: `cls-${String(store.classes.length + 1).padStart(3, "0")}`,
       tenantId: TENANT_ID,
       enrolledCount: 0,
+      notes: input.notes ?? null,
+      isActive: true,
     };
     store.classes.push(cls);
     store.classes$.set([...store.classes]);
@@ -71,46 +64,68 @@ export class MockClassRepository implements ClassRepository {
       entityId: cls.id,
       actorId: "usr-current",
       actorName: "Session courante",
+      diff: {
+        before: null,
+        after: { code: cls.code, name: cls.name, gradeCode: cls.gradeCode },
+      },
+      note: `Création de classe: ${cls.name} (${cls.gradeCode})`,
     });
     return Ok(cls);
   }
-  async updateClass(id: string, updates: Partial<AcademicClass>): Promise<Result<AcademicClass>> {
+  async updateClass(
+    id: string,
+    updates: Partial<AcademicClass>,
+  ): Promise<Result<AcademicClass>> {
     await delay(180);
     const idx = store.classes.findIndex((c) => c.id === id);
     if (idx < 0) return Err(Errors.notFound("Class", id));
-    const after = { ...store.classes[idx], ...updates };
+    const before = store.classes[idx];
+    const after = { ...before, ...updates };
     store.classes[idx] = after;
     store.classes$.set([...store.classes]);
+    appendAudit({
+      action: AuditActions.ClassUpdate,
+      entityType: "class",
+      entityId: id,
+      actorId: "usr-current",
+      actorName: "Session courante",
+      diff: { before, after },
+    });
     return Ok(after);
   }
   async deleteClass(id: string): Promise<Result<void>> {
     await delay(180);
     store.classes = store.classes.filter((c) => c.id !== id);
     store.classes$.set([...store.classes]);
+    appendAudit({
+      action: "class.delete",
+      entityType: "class",
+      entityId: id,
+      actorId: "usr-current",
+      actorName: "Session courante",
+    });
     return Ok(undefined);
   }
 }
 
 // ============================================================================
-// Subjects (also handles class-subject mappings)
+// Subjects
 // ============================================================================
-
 export class MockSubjectRepository implements SubjectRepository {
   observe(): Observable<Subject[]> {
     return store.subjects$;
   }
-  observeByLevel(level: string): Observable<Subject[]> {
+  observeByLevel(level: AcademicLevel): Observable<Subject[]> {
     return new SubjectBehavior(store.subjects.filter((s) => s.level === level));
   }
-  /**
-   * Iteration 6: Returns the actual class-subject mappings from the seed data
-   * (previously returned an empty array, which made the Class Subjects tab
-   * always render an empty state).
-   */
   observeByClass(classId: string): Observable<ClassSubject[]> {
-    return new SubjectBehavior(store.classSubjects.filter((cs) => cs.classId === classId));
+    return new SubjectBehavior(
+      store.classSubjects.filter((cs) => cs.classId === classId),
+    );
   }
-  async assignSubjectToClass(input: Omit<ClassSubject, "id">): Promise<Result<ClassSubject>> {
+  async assignSubjectToClass(
+    input: Omit<ClassSubject, "id">,
+  ): Promise<Result<ClassSubject>> {
     await delay(180);
     const cs: ClassSubject = { ...input, id: `csj-${Date.now()}` };
     store.classSubjects = [...store.classSubjects, cs];
@@ -142,12 +157,14 @@ export class MockSubjectRepository implements SubjectRepository {
     return Ok(undefined);
   }
 
-  async createSubject(input: Omit<Subject, "id" | "tenantId">): Promise<Result<Subject>> {
+  async createSubject(
+    input: Omit<Subject, "id" | "tenantId">,
+  ): Promise<Result<Subject>> {
     await delay(120);
     const subj: Subject = {
       ...input,
       id: `subj-${Date.now()}`,
-      tenantId: "tenant-el-imtiyaz-oran-001",
+      tenantId: TENANT_ID,
     };
     store.subjects = [...store.subjects, subj];
     store.subjects$.set(store.subjects);
@@ -163,7 +180,10 @@ export class MockSubjectRepository implements SubjectRepository {
     return Ok(subj);
   }
 
-  async updateSubject(id: string, updates: Partial<Omit<Subject, "id" | "tenantId">>): Promise<Result<Subject>> {
+  async updateSubject(
+    id: string,
+    updates: Partial<Omit<Subject, "id" | "tenantId">>,
+  ): Promise<Result<Subject>> {
     await delay(120);
     const idx = store.subjects.findIndex((s) => s.id === id);
     if (idx < 0) return Err(Errors.unknown("Subject not found"));
@@ -178,9 +198,10 @@ export class MockSubjectRepository implements SubjectRepository {
       actorId: "mock",
       actorName: "Mock",
       diff: { before, after },
-      note: updates.coefficient != null
-        ? `Coefficient modifié: ${before.coefficient} → ${updates.coefficient} (GPA sera recalculé)`
-        : "Matière modifiée",
+      note:
+        updates.coefficient != null
+          ? `Coefficient modifié: ${before.coefficient} → ${updates.coefficient}`
+          : "Matière modifiée",
     });
     return Ok(after);
   }
@@ -204,28 +225,37 @@ export class MockSubjectRepository implements SubjectRepository {
 }
 
 // ============================================================================
-// Grades (assessments)
+// Grades
 // ============================================================================
-
 export class MockGradeRepository implements GradeRepository {
-  /**
-   * Iteration 6: Returns real seeded assessment data (previously returned empty).
-   */
   observeForStudent(studentId: string): Observable<Assessment[]> {
-    return new SubjectBehavior(store.assessments.filter((a) => a.studentId === studentId));
+    return new SubjectBehavior(
+      store.assessments.filter((a) => a.studentId === studentId),
+    );
   }
-  observeForClass(classId: string): Observable<Assessment[]> {
-    return new SubjectBehavior(store.assessments.filter((a) => a.classId === classId));
+  observeForClass(
+    classId: string,
+    _academicYear?: string,
+    _term?: string,
+  ): Observable<Assessment[]> {
+    return new SubjectBehavior(
+      store.assessments.filter((a) => a.classId === classId),
+    );
   }
-  async enterGrade(input: Omit<Assessment, "id" | "subjectAverage" | "enteredAt">): Promise<Result<Assessment>> {
+  async enterGrade(
+    input: Omit<Assessment, "id" | "subjectAverage" | "enteredAt">,
+  ): Promise<Result<Assessment>> {
     await delay(150);
     const asm: Assessment = {
       ...input,
       id: `asm-${Date.now()}`,
-      subjectAverage: computeSubjectAverage(input.devoir1, input.devoir2, input.examen),
+      subjectAverage: computeSubjectAverage(
+        input.devoir1,
+        input.devoir2,
+        input.examen,
+      ),
       enteredAt: nowIso(),
     };
-    // Iteration 6: persist the assessment so subsequent reads return it.
     store.assessments = [asm, ...store.assessments];
     store.notifyAssessments();
     appendAudit({
@@ -237,22 +267,55 @@ export class MockGradeRepository implements GradeRepository {
     });
     return Ok(asm);
   }
+
+  async enterGradesBatch(
+    inputs: ReadonlyArray<
+      Omit<Assessment, "id" | "subjectAverage" | "enteredAt">
+    >,
+  ): Promise<Result<Assessment[]>> {
+    await delay(250);
+    const created: Assessment[] = inputs.map((input) => ({
+      ...input,
+      id: `asm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      subjectAverage: computeSubjectAverage(
+        input.devoir1,
+        input.devoir2,
+        input.examen,
+      ),
+      enteredAt: nowIso(),
+    }));
+
+    store.assessments = [...created, ...store.assessments];
+    store.notifyAssessments();
+    appendAudit({
+      action: AuditActions.GradeEnter,
+      entityType: "assessment",
+      entityId: "batch",
+      actorId: inputs[0]?.enteredBy ?? "mock",
+      actorName: "Session courante",
+      diff: { before: null, after: { count: created.length } },
+    });
+    return Ok(created);
+  }
 }
 
 // ============================================================================
-// Attendance (roll call)
+// Attendance
 // ============================================================================
-
 export class MockAttendanceRepository implements AttendanceRepository {
-  /**
-   * Iteration 6: Returns real seeded attendance records (previously returned empty).
-   */
-  observeByClass(classId: string, date: string): Observable<AttendanceRecord[]> {
+  observeByClass(
+    classId: string,
+    date: string,
+  ): Observable<AttendanceRecord[]> {
     return new SubjectBehavior(
       store.attendance.filter((r) => r.classId === classId && r.date === date),
     );
   }
-  observeByStudent(studentId: string, from: string, to: string): Observable<AttendanceRecord[]> {
+  observeByStudent(
+    studentId: string,
+    from: string,
+    to: string,
+  ): Observable<AttendanceRecord[]> {
     return new SubjectBehavior(
       store.attendance.filter(
         (r) => r.studentId === studentId && r.date >= from && r.date <= to,
@@ -267,19 +330,20 @@ export class MockAttendanceRepository implements AttendanceRepository {
     recordedBy: string;
   }): Promise<Result<AttendanceRecord[]>> {
     await delay(220);
-    const records: AttendanceRecord[] = [...input.statuses.entries()].map(([studentId, status]) => ({
-      id: `att-${Date.now()}-${studentId}`,
-      studentId,
-      classId: input.classId,
-      date: input.date,
-      session: input.session,
-      status,
-      note: null,
-      recordedBy: input.recordedBy,
-      recordedAt: nowIso(),
-      syncedAt: nowIso(),
-    }));
-    // Iteration 6: persist the records so subsequent reads return them.
+    const records: AttendanceRecord[] = [...input.statuses.entries()].map(
+      ([studentId, status]) => ({
+        id: `att-${Date.now()}-${studentId}`,
+        studentId,
+        classId: input.classId,
+        date: input.date,
+        session: input.session,
+        status,
+        note: null,
+        recordedBy: input.recordedBy,
+        recordedAt: nowIso(),
+        syncedAt: nowIso(),
+      }),
+    );
     store.attendance = [...records, ...store.attendance];
     store.notifyAttendance();
     const present = records.filter((r) => r.status === "present").length;
@@ -289,7 +353,14 @@ export class MockAttendanceRepository implements AttendanceRepository {
       entityId: input.classId,
       actorId: input.recordedBy,
       actorName: "Session courante",
-      diff: { before: null, after: { total: records.length, present, absent: records.length - present } },
+      diff: {
+        before: null,
+        after: {
+          total: records.length,
+          present,
+          absent: records.length - present,
+        },
+      },
     });
     return Ok(records);
   }
@@ -309,16 +380,18 @@ export class MockAttendanceRepository implements AttendanceRepository {
 // ============================================================================
 // Homework
 // ============================================================================
-
 export class MockHomeworkRepository implements HomeworkRepository {
-  /**
-   * Iteration 6: Returns real seeded homework records (previously returned empty).
-   */
   observeForClass(classId: string): Observable<Homework[]> {
-    return new SubjectBehavior(store.homework.filter((h) => h.classId === classId));
+    return new SubjectBehavior(
+      classId
+        ? store.homework.filter((h) => h.classId === classId)
+        : store.homework,
+    );
   }
   observeByTeacher(teacherId: string): Observable<Homework[]> {
-    return new SubjectBehavior(store.homework.filter((h) => h.teacherId === teacherId));
+    return new SubjectBehavior(
+      store.homework.filter((h) => h.teacherId === teacherId),
+    );
   }
   async push(input: {
     classId: string;
@@ -328,10 +401,9 @@ export class MockHomeworkRepository implements HomeworkRepository {
     title: string;
     description: string;
     dueDate: string;
-    attachments: string[];
+    attachments: readonly string[];
   }): Promise<Result<Homework>> {
     await delay(200);
-    // Look up the subject name from the seed data.
     const subject = store.subjects.find((s) => s.id === input.subjectId);
     const hw: Homework = {
       ...input,
@@ -343,7 +415,6 @@ export class MockHomeworkRepository implements HomeworkRepository {
       pushedAt: nowIso(),
       acknowledgedCount: 0,
     };
-    // Iteration 6: persist the homework so the history tab shows it.
     store.homework = [hw, ...store.homework];
     store.notifyHomework();
     appendAudit({
@@ -358,14 +429,90 @@ export class MockHomeworkRepository implements HomeworkRepository {
 }
 
 // ============================================================================
-// Singletons — exported for the barrel re-export in `mock-repositories.ts`.
+// Promotion
 // ============================================================================
+export class MockPromotionRepository implements PromotionRepository {
+  async executeBatchPromotion(input: {
+    candidates: readonly {
+      candidate: PromotionCandidate;
+      finalDecision: import("../../../domain/model/academic").PromotionDecision;
+    }[];
+    targetAcademicYear: string;
+    performedBy: string;
+    performedByName: string;
+  }): Promise<Result<{ promotedStudents: Student[]; updatedCount: number }>> {
+    await delay(300);
+    const updatedStudents: Student[] = [];
 
+    for (const item of input.candidates) {
+      const { candidate, finalDecision } = item;
+      const idx = store.students.findIndex(
+        (s) => s.id === candidate.student.id,
+      );
+      if (idx >= 0) {
+        const current = store.students[idx];
+        const nextGradeLevel =
+          finalDecision === "promoted" && candidate.nextGradeLevel
+            ? candidate.nextGradeLevel
+            : current.gradeLevel;
+        const nextLevel =
+          finalDecision === "promoted" && candidate.nextAcademicLevel
+            ? candidate.nextAcademicLevel
+            : current.level;
+        const nextGradeYear =
+          finalDecision === "promoted" && candidate.nextGradeYear
+            ? candidate.nextGradeYear
+            : current.gradeYear;
+
+        const updated: Student = {
+          ...current,
+          gradeLevel: nextGradeLevel,
+          level: nextLevel,
+          gradeYear: nextGradeYear,
+          status: finalDecision === "graduated" ? "graduated" : current.status,
+          updatedAt: nowIso(),
+        };
+
+        store.students[idx] = updated;
+        updatedStudents.push(updated);
+      }
+    }
+
+    store.notifyStudents();
+
+    appendAudit({
+      action: AuditActions.StudentPromote,
+      entityType: "student",
+      entityId: "batch",
+      actorId: input.performedBy,
+      actorName: input.performedByName,
+      diff: {
+        before: null,
+        after: {
+          count: updatedStudents.length,
+          targetYear: input.targetAcademicYear,
+        },
+      },
+      note: `Promotion de classe exécutée vers l'année ${input.targetAcademicYear}`,
+    });
+
+    return Ok({
+      promotedStudents: updatedStudents,
+      updatedCount: updatedStudents.length,
+    });
+  }
+}
+
+// Singletons
 export const mockClassRepository: ClassRepository = new MockClassRepository();
-export const mockSubjectRepository: SubjectRepository = new MockSubjectRepository();
+export const mockSubjectRepository: SubjectRepository =
+  new MockSubjectRepository();
 export const mockGradeRepository: GradeRepository = new MockGradeRepository();
-export const mockAttendanceRepository: AttendanceRepository = new MockAttendanceRepository();
-export const mockHomeworkRepository: HomeworkRepository = new MockHomeworkRepository();
+export const mockAttendanceRepository: AttendanceRepository =
+  new MockAttendanceRepository();
+export const mockHomeworkRepository: HomeworkRepository =
+  new MockHomeworkRepository();
+export const mockPromotionRepository: PromotionRepository =
+  new MockPromotionRepository();
 
-// Re-export Observable so consumers of this file don't need a second import.
 export type { Observable };

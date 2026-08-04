@@ -1,15 +1,3 @@
-/**
- * SubjectsDirectoryTab — replaces flat list in Academics page.
- *
- * Iteration 3-E (plan §05): Subject CRUD (create / edit coefficient /
- * archive) with full audit logging. Coefficient change is wired to
- * trigger GPA recompute for affected students (audit-log note documents
- * the trigger; actual recompute happens at the repository layer in
- * production via Supabase Edge Function).
- *
- * Built on UnifiedModal so the visual language matches every other
- * modal in the application.
- */
 import { useState } from "react";
 import { Plus, BookOpen, Edit2, Archive, Filter, Search } from "lucide-react";
 import { useRepositories } from "../../app/providers/repository-provider";
@@ -21,22 +9,33 @@ import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { Input } from "../../shared/ui/input";
 import { Avatar, AvatarFallback } from "../../shared/ui/avatar";
-import { ConfirmModal } from "../../shared/ui/unified-modal";
-import { UnifiedModal, type UnifiedModalProps } from "../../shared/ui/unified-modal";
+import {
+  UnifiedModal,
+  ConfirmModal,
+  type UnifiedModalProps,
+} from "../../shared/ui/unified-modal";
 import { FormField } from "../../shared/ui/form-field";
 import { EmptyState } from "../../shared/layout/state-views";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "../../shared/ui/select";
 import { Permission } from "../../core/rbac/permissions";
-import { LEVEL_LABELS_FR, type AcademicLevel } from "../../domain/model/student";
-import type { Subject } from "../../domain/model/academic";
+import {
+  LEVEL_LABELS_FR,
+  type AcademicLevel,
+} from "../../domain/model/student";
+import type { AcademicCycle, Subject } from "../../domain/model/academic";
 
 type Alert = NonNullable<UnifiedModalProps["alert"]>;
 
-interface SubjectForm {
+interface SubjectFormState {
   name: string;
   code: string;
+  cycle: AcademicCycle;
   level: AcademicLevel;
   coefficient: number;
   passingGrade: number;
@@ -44,9 +43,10 @@ interface SubjectForm {
   nameAr: string;
 }
 
-const EMPTY_FORM: SubjectForm = {
+const INITIAL_FORM: SubjectFormState = {
   name: "",
   code: "",
+  cycle: "primaire",
   level: "primaire",
   coefficient: 1,
   passingGrade: 10,
@@ -59,22 +59,25 @@ export function SubjectsDirectoryTab() {
   const toast = useToast();
   const { session } = useAuth();
   const subjects = useObservable(() => repos.subjects.observe(), []);
-  const [query, setQuery] = useState("");
-  const [levelFilter, setLevelFilter] = useState<string>("all");
 
-  // Modal state
+  const [search, setSearch] = useState("");
+  const [cycleFilter, setCycleFilter] = useState<string>("all");
+
   const [createOpen, setCreateOpen] = useState(false);
-  const [editSubject, setEditSubject] = useState<Subject | null>(null);
-  const [archiveSubject, setArchiveSubject] = useState<Subject | null>(null);
-  const [form, setForm] = useState<SubjectForm>(EMPTY_FORM);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [archivingSubject, setArchivingSubject] = useState<Subject | null>(
+    null,
+  );
+  const [form, setForm] = useState<SubjectFormState>(INITIAL_FORM);
   const [alert, setAlert] = useState<Alert | null>(null);
 
-  const canManage = !!session && session.permissions.has(Permission.ManageSubjects);
+  const canManage =
+    !!session && session.permissions.has(Permission.ManageSubjects);
 
   const filtered = subjects.filter((s) => {
-    if (levelFilter !== "all" && s.level !== levelFilter) return false;
-    if (!query.trim()) return true;
-    const q = query.toLowerCase();
+    if (cycleFilter !== "all" && s.cycle !== cycleFilter) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
     return (
       s.name.toLowerCase().includes(q) ||
       s.code.toLowerCase().includes(q) ||
@@ -82,16 +85,17 @@ export function SubjectsDirectoryTab() {
     );
   });
 
-  function openCreate() {
-    setForm(EMPTY_FORM);
+  function openCreateModal() {
+    setForm(INITIAL_FORM);
     setAlert(null);
     setCreateOpen(true);
   }
 
-  function openEdit(s: Subject) {
+  function openEditModal(s: Subject) {
     setForm({
       name: s.name,
       code: s.code,
+      cycle: s.cycle,
       level: s.level,
       coefficient: s.coefficient,
       passingGrade: s.passingGrade,
@@ -99,72 +103,98 @@ export function SubjectsDirectoryTab() {
       nameAr: s.nameAr ?? "",
     });
     setAlert(null);
-    setEditSubject(s);
+    setEditingSubject(s);
   }
 
-  async function saveCreate() {
+  async function handleCreate() {
     if (!form.name.trim() || !form.code.trim()) {
-      setAlert({ tone: "warning", title: "Champs requis", description: "Nom et code sont obligatoires." });
+      setAlert({
+        tone: "warning",
+        title: "Validation",
+        description: "Le nom et le code de la matière sont obligatoires.",
+      });
       return;
     }
-    if (subjects.some((s) => s.code.toLowerCase() === form.code.trim().toLowerCase())) {
-      setAlert({ tone: "warning", title: "Code dupliqué", description: `Le code ${form.code} existe déjà.` });
-      return;
-    }
-    const r = await repos.subjects.createSubject({
+
+    const result = await repos.subjects.createSubject({
       name: form.name.trim(),
       code: form.code.trim().toUpperCase(),
+      cycle: form.cycle,
       level: form.level,
       coefficient: form.coefficient,
       passingGrade: form.passingGrade,
       isExtracurricular: form.isExtracurricular,
       nameAr: form.nameAr.trim() || null,
+      isActive: true,
     });
-    if (r.ok) {
-      toast.showSuccess("Matière créée", `${r.value.name} (${r.value.code}) ajoutée au catalogue.`);
+
+    if (result.ok) {
+      toast.showSuccess(
+        "Matière créée",
+        `${result.value.name} (${result.value.code}) a été ajoutée.`,
+      );
       setCreateOpen(false);
     } else {
-      setAlert({ tone: "error", title: "Échec", description: r.error.userMessage });
+      setAlert({
+        tone: "error",
+        title: "Erreur",
+        description: result.error.userMessage,
+      });
     }
   }
 
-  async function saveEdit() {
-    if (!editSubject) return;
+  async function handleUpdate() {
+    if (!editingSubject) return;
     if (!form.name.trim() || !form.code.trim()) {
-      setAlert({ tone: "warning", title: "Champs requis", description: "Nom et code sont obligatoires." });
+      setAlert({
+        tone: "warning",
+        title: "Validation",
+        description: "Le nom et le code sont obligatoires.",
+      });
       return;
     }
-    const coefChanged = form.coefficient !== editSubject.coefficient;
-    const r = await repos.subjects.updateSubject(editSubject.id, {
+
+    const coefChanged = form.coefficient !== editingSubject.coefficient;
+
+    const result = await repos.subjects.updateSubject(editingSubject.id, {
       name: form.name.trim(),
       code: form.code.trim().toUpperCase(),
+      cycle: form.cycle,
       level: form.level,
       coefficient: form.coefficient,
       passingGrade: form.passingGrade,
       isExtracurricular: form.isExtracurricular,
       nameAr: form.nameAr.trim() || null,
     });
-    if (r.ok) {
+
+    if (result.ok) {
       toast.showSuccess(
-        "Matière modifiée",
+        "Matière mise à jour",
         coefChanged
-          ? `Coefficient: ${editSubject.coefficient} → ${form.coefficient}. Les GPA affectés seront recalculés.`
-          : "Modifications enregistrées.",
+          ? `Le coefficient a changé (${editingSubject.coefficient} → ${form.coefficient}). Un recalcul des moyennes sera effectué.`
+          : "Les modifications ont été enregistrées.",
       );
-      setEditSubject(null);
+      setEditingSubject(null);
     } else {
-      setAlert({ tone: "error", title: "Échec", description: r.error.userMessage });
+      setAlert({
+        tone: "error",
+        title: "Erreur",
+        description: result.error.userMessage,
+      });
     }
   }
 
-  async function confirmArchive() {
-    if (!archiveSubject) return;
-    const r = await repos.subjects.archiveSubject(archiveSubject.id);
-    if (r.ok) {
-      toast.showSuccess("Matière archivée", `${archiveSubject.name} a été retirée du catalogue actif.`);
-      setArchiveSubject(null);
+  async function handleArchive() {
+    if (!archivingSubject) return;
+    const result = await repos.subjects.archiveSubject(archivingSubject.id);
+    if (result.ok) {
+      toast.showSuccess(
+        "Matière archivée",
+        `${archivingSubject.name} a été retirée.`,
+      );
+      setArchivingSubject(null);
     } else {
-      toast.showError("Échec", r.error.userMessage);
+      toast.showError("Échec de l'archivage", result.error.userMessage);
     }
   }
 
@@ -172,31 +202,32 @@ export function SubjectsDirectoryTab() {
     <div className="space-y-3">
       <Card>
         <CardContent className="p-0">
-          {/* Toolbar */}
           <div className="flex items-center gap-2 border-b border-border p-3">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Rechercher par nom, code…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Rechercher par nom, code ou nom arabe…"
                 className="pl-9"
               />
             </div>
-            <Select value={levelFilter} onValueChange={setLevelFilter}>
-              <SelectTrigger className="w-40">
+
+            <Select value={cycleFilter} onValueChange={setCycleFilter}>
+              <SelectTrigger className="w-44 h-9">
                 <Filter className="h-3.5 w-3.5 mr-1" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous niveaux</SelectItem>
+                <SelectItem value="all">Tous les cycles</SelectItem>
                 <SelectItem value="primaire">Primaire</SelectItem>
-                <SelectItem value="cem">CEM</SelectItem>
+                <SelectItem value="cem">CEM (Collège)</SelectItem>
                 <SelectItem value="lycee">Lycée</SelectItem>
               </SelectContent>
             </Select>
+
             {canManage && (
-              <Button size="sm" onClick={openCreate}>
+              <Button size="sm" onClick={openCreateModal}>
                 <Plus className="h-4 w-4" /> Nouvelle matière
               </Button>
             )}
@@ -205,44 +236,76 @@ export function SubjectsDirectoryTab() {
           {filtered.length === 0 ? (
             <EmptyState
               title="Aucune matière"
-              description="Le catalogue de matières est vide pour ce filtre."
+              description="Aucune matière ne correspond aux critères de recherche."
             />
           ) : (
             <ul className="divide-y divide-border">
               {filtered.map((s) => (
-                <li key={s.id} className="flex items-center gap-3 p-3 hover:bg-accent/5 group">
+                <li
+                  key={s.id}
+                  className="flex items-center gap-3 p-3.5 hover:bg-accent/5 transition-colors group"
+                >
                   <Avatar className="h-9 w-9 rounded-md">
-                    <AvatarFallback className="rounded-md text-xs">
+                    <AvatarFallback className="rounded-md font-mono text-xs bg-primary/10 text-primary">
                       {s.code.slice(0, 3)}
                     </AvatarFallback>
                   </Avatar>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium text-foreground">{s.name}</p>
-                      <span className="font-mono text-xs text-muted-foreground">{s.code}</span>
-                      {s.nameAr && <span className="text-xs text-muted-foreground" dir="rtl">{s.nameAr}</span>}
-                      <Badge variant="outline">{LEVEL_LABELS_FR[s.level]}</Badge>
-                      {s.isExtracurricular && <Badge variant="secondary">Extracurr.</Badge>}
+                      <p className="text-sm font-semibold text-foreground">
+                        {s.name}
+                      </p>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        ({s.code})
+                      </span>
+                      {s.nameAr && (
+                        <span
+                          className="text-xs text-muted-foreground"
+                          dir="rtl"
+                        >
+                          {s.nameAr}
+                        </span>
+                      )}
+                      <Badge variant="outline">
+                        {LEVEL_LABELS_FR[s.level]}
+                      </Badge>
+                      {s.isExtracurricular && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-status-info/10 text-status-info border-status-info/20"
+                        >
+                          Club / Activité
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Coef. {s.coefficient} · Seuil {s.passingGrade}/20
+                      Coefficient :{" "}
+                      <span className="font-mono font-bold text-foreground">
+                        {s.coefficient}
+                      </span>{" "}
+                      · Seuil de passage :{" "}
+                      <span className="font-mono">{s.passingGrade}/20</span>
                     </p>
                   </div>
+
                   {canManage && (
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
-                        variant="ghost" size="icon" className="h-7 w-7"
-                        onClick={() => openEdit(s)}
-                        title="Modifier"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEditModal(s)}
                       >
-                        <Edit2 className="h-3.5 w-3.5" />
+                        <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="ghost" size="icon" className="h-7 w-7 text-status-danger hover:text-status-danger"
-                        onClick={() => setArchiveSubject(s)}
-                        title="Archiver"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-status-danger"
+                        onClick={() => setArchivingSubject(s)}
                       >
-                        <Archive className="h-3.5 w-3.5" />
+                        <Archive className="h-4 w-4" />
                       </Button>
                     </div>
                   )}
@@ -253,118 +316,151 @@ export function SubjectsDirectoryTab() {
         </CardContent>
       </Card>
 
-      <p className="text-[11px] text-muted-foreground">
-        Plan §05 — Scolarité (primaire/CEM/lycée) + Extracurricular (clubs & thérapie).
-        Les notes extracurriculaires ne sont JAMAIS incluses dans le GPA Scolarité.
-        Modifier un coefficient déclenche un recalcul des GPA affectés.
-      </p>
-
-      {/* Create / Edit modal (shared form) */}
       <UnifiedModal
-        open={createOpen || editSubject !== null}
+        open={createOpen || editingSubject !== null}
         onOpenChange={(o) => {
           if (!o) {
             setCreateOpen(false);
-            setEditSubject(null);
+            setEditingSubject(null);
           }
         }}
         size="md"
         icon={BookOpen}
         iconTone="primary"
-        title={editSubject ? `Modifier: ${editSubject.name}` : "Nouvelle matière"}
-        description={editSubject ? "Les modifications sont journalisées dans l'audit log." : "Ajout au catalogue des matières du niveau sélectionné."}
-        submitLabel={editSubject ? "Enregistrer" : "Créer"}
-        submitIcon={editSubject ? Edit2 : Plus}
-        onSubmit={editSubject ? saveEdit : saveCreate}
+        title={
+          editingSubject
+            ? `Modifier ${editingSubject.name}`
+            : "Nouvelle Matière"
+        }
+        description="Configuration de la matière et de sa pondération dans la moyenne globale Scolarité."
+        submitLabel={
+          editingSubject ? "Enregistrer les modifications" : "Créer la matière"
+        }
+        onSubmit={editingSubject ? handleUpdate : handleCreate}
         alert={alert}
         onDismissAlert={() => setAlert(null)}
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
-            <FormField label="Nom" required>
+            <FormField label="Nom (Français)" required>
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Mathématiques"
               />
             </FormField>
-            <FormField label="Code" required hint="Code court unique (ex: MATH)">
+
+            <FormField
+              label="Code court"
+              required
+              hint="Code unique (ex: MATH)"
+            >
               <Input
                 value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                onChange={(e) =>
+                  setForm({ ...form, code: e.target.value.toUpperCase() })
+                }
                 placeholder="MATH"
-                className="font-mono"
+                className="font-mono uppercase"
               />
             </FormField>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
-            <FormField label="Niveau" required>
-              <Select value={form.level} onValueChange={(v) => setForm({ ...form, level: v as AcademicLevel })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+            <FormField label="Cycle" required>
+              <Select
+                value={form.cycle}
+                onValueChange={(v) => {
+                  const cycle = v as AcademicCycle;
+                  const level: AcademicLevel =
+                    cycle === "cem"
+                      ? "cem"
+                      : cycle === "lycee"
+                        ? "lycee"
+                        : "primaire";
+                  setForm({ ...form, cycle, level });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="primaire">Primaire</SelectItem>
-                  <SelectItem value="cem">CEM</SelectItem>
+                  <SelectItem value="cem">CEM (Collège)</SelectItem>
                   <SelectItem value="lycee">Lycée</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>
+
             <FormField label="Coefficient" required>
               <Input
                 type="number"
-                min={1}
+                min={0.5}
                 max={10}
+                step={0.5}
                 value={form.coefficient}
-                onChange={(e) => setForm({ ...form, coefficient: Number(e.target.value) })}
+                onChange={(e) =>
+                  setForm({ ...form, coefficient: Number(e.target.value) })
+                }
+                className="font-mono"
               />
             </FormField>
-            <FormField label="Seuil de passage" required hint="Sur 20">
+
+            <FormField label="Seuil admis" required hint="Sur 20">
               <Input
                 type="number"
                 min={0}
                 max={20}
                 step={0.5}
                 value={form.passingGrade}
-                onChange={(e) => setForm({ ...form, passingGrade: Number(e.target.value) })}
+                onChange={(e) =>
+                  setForm({ ...form, passingGrade: Number(e.target.value) })
+                }
+                className="font-mono"
               />
             </FormField>
           </div>
 
-          <FormField label="Nom en arabe (optionnel)">
+          <FormField label="Nom en Arabe (optionnel)">
             <Input
               value={form.nameAr}
               onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
-              placeholder="رياضيات"
+              placeholder="الرياضيات"
               dir="rtl"
             />
           </FormField>
 
-          <label className="flex items-center gap-2 rounded-md border border-border p-3 cursor-pointer hover:bg-accent/5">
+          <label className="flex items-start gap-2.5 rounded-md border border-border p-3 cursor-pointer hover:bg-accent/5">
             <input
               type="checkbox"
               checked={form.isExtracurricular}
-              onChange={(e) => setForm({ ...form, isExtracurricular: e.target.checked })}
-              className="h-4 w-4"
+              onChange={(e) =>
+                setForm({ ...form, isExtracurricular: e.target.checked })
+              }
+              className="h-4 w-4 mt-0.5"
             />
-            <div>
-              <p className="text-sm font-medium">Matière extracurriculaire</p>
-              <p className="text-xs text-muted-foreground">
-                Club / thérapie — les notes ne sont JAMAIS incluses dans le GPA Scolarité (plan §05.07).
+            <div className="text-xs">
+              <p className="font-semibold text-foreground">
+                Activité / Club Extracurriculaire
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Si coché, les notes obtenues dans cette matière ne seront
+                **jamais** comptabilisées dans la moyenne générale académique
+                Scolarité.
               </p>
             </div>
           </label>
         </div>
       </UnifiedModal>
 
-      {/* Archive confirmation */}
       <ConfirmModal
-        open={archiveSubject !== null}
-        onOpenChange={(o) => !o && setArchiveSubject(null)}
-        title={`Archiver: ${archiveSubject?.name ?? ""}`}
-        description="La matière sera retirée du catalogue actif. Les notes déjà saisies sont conservées dans l'historique."
-        confirmLabel="Archiver"
+        open={archivingSubject !== null}
+        onOpenChange={(o) => !o && setArchivingSubject(null)}
+        title={`Archiver la matière ${archivingSubject?.name ?? ""}`}
+        description="Cette matière sera masquée pour les futures saisies. L'historique des notes passées reste intact."
+        confirmLabel="Archiver la matière"
         destructive
-        onConfirm={confirmArchive}
+        onConfirm={handleArchive}
       />
     </div>
   );

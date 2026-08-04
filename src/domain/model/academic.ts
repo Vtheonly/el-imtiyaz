@@ -1,41 +1,65 @@
-/**
- * Academic domain — classes, subjects, assessments, attendance, homework.
- *
- * Plan §05 enforces a hard boundary between Scolarité (formal academics)
- * and Extracurricular (clubs & therapy). Club grades NEVER bleed into
- * Scolarité GPA. The `isExtracurricular` flag on Subject enforces this.
- *
- * Grading formula (plan §06):
- *   subject_average = (D1 + D2 + 2·Examen) / 4   (each 0..20)
- *   overall_gpa     = Σ(subject_avg × coef) / Σ(coef)
- *   passing grade   = 10.0 (admin-configurable)
- */
-import type { AcademicLevel } from "./student";
+import type { AcademicLevel, GradeLevel } from "./student";
+
+export type AcademicCycle = "prescolaire" | "primaire" | "cem" | "lycee";
+export type AcademicTerm = "T1" | "T2" | "T3";
+export type TermStructure = "semester" | "trimester" | "quarter";
+
+export interface AcademicYear {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly code: string; // e.g. "2025-2026"
+  readonly label: string;
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly termStructure: TermStructure;
+  readonly isCurrent: boolean;
+  readonly isArchived: boolean;
+}
+
+export interface AcademicLevelModel {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly cycle: AcademicCycle;
+  readonly gradeCode: GradeLevel;
+  readonly labelFr: string;
+  readonly labelAr: string | null;
+  readonly yearNumber: number;
+  readonly sortOrder: number;
+  readonly isActive: boolean;
+}
 
 export interface AcademicClass {
   readonly id: string;
   readonly tenantId: string;
-  readonly name: string; // "5ème A"
+  readonly academicYearId: string;
+  readonly academicLevelId: string;
+  readonly code: string; // e.g. "CLS-3AP-B"
+  readonly name: string; // e.g. "3ème AP - Section B"
+  readonly gradeCode: GradeLevel;
   readonly level: AcademicLevel;
   readonly gradeYear: number;
+  readonly section: string; // e.g. "Section B"
+  readonly room: string | null;
+  readonly enrolledCount: number;
   readonly homeroomTeacherId: string | null;
   readonly homeroomTeacherName: string | null;
-  readonly room: string | null;
-  readonly capacity: number;
-  readonly enrolledCount: number;
+  readonly notes: string | null; // Custom notes/observations per class
   readonly academicYear: string;
+  readonly isActive: boolean;
 }
 
 export interface Subject {
   readonly id: string;
   readonly tenantId: string;
+  readonly code: string;
   readonly name: string;
   readonly nameAr: string | null;
-  readonly code: string; // MATH, PHY, AR, FR, EN, ISL...
+  readonly cycle: AcademicCycle;
   readonly level: AcademicLevel;
   readonly coefficient: number;
-  readonly isExtracurricular: boolean; // §05.07 — clubs & therapy
   readonly passingGrade: number;
+  readonly isExtracurricular: boolean;
+  readonly isActive: boolean;
 }
 
 export interface ClassSubject {
@@ -48,32 +72,34 @@ export interface ClassSubject {
   readonly coefficient: number;
 }
 
-export type AcademicTerm = "T1" | "T2" | "T3";
-
 export interface Assessment {
   readonly id: string;
   readonly studentId: string;
-  readonly subjectId: string;
   readonly classId: string;
+  readonly subjectId: string;
   readonly term: AcademicTerm;
   readonly academicYear: string;
-  readonly devoir1: number | null; // 0..20
-  readonly devoir2: number | null; // 0..20
-  readonly examen: number | null; // 0..20, weighted 2×
+  readonly devoir1: number | null;
+  readonly devoir2: number | null;
+  readonly examen: number | null;
   readonly subjectAverage: number | null;
   readonly coefficient: number;
   readonly enteredBy: string;
   readonly enteredAt: string;
 }
 
-export type AttendanceStatus = "present" | "absent_excused" | "absent_unexcused" | "late";
+export type AttendanceStatus =
+  | "present"
+  | "absent_excused"
+  | "absent_unexcused"
+  | "late";
 export type AttendanceSession = "morning" | "afternoon" | "both";
 
 export interface AttendanceRecord {
   readonly id: string;
   readonly studentId: string;
   readonly classId: string;
-  readonly date: string; // ISO date (yyyy-MM-dd)
+  readonly date: string;
   readonly session: AttendanceSession;
   readonly status: AttendanceStatus;
   readonly note: string | null;
@@ -99,6 +125,29 @@ export interface Homework {
   readonly acknowledgedCount: number;
 }
 
+export type PromotionDecision =
+  | "promoted"
+  | "repeated"
+  | "graduated"
+  | "transferred";
+
+export interface AcademicHistoryEntry {
+  readonly id?: string;
+  readonly studentId: string;
+  readonly academicYear: string;
+  readonly cycle: AcademicCycle;
+  readonly level: AcademicLevel;
+  readonly gradeCode: GradeLevel;
+  readonly gradeYear: number;
+  readonly classId: string | null;
+  readonly className: string | null;
+  readonly gpa: number;
+  readonly rank: number | null;
+  readonly decision: PromotionDecision;
+  readonly narrative: string | null;
+  readonly recordedAt?: string;
+}
+
 export const ATTENDANCE_STATUS_LABELS_FR: Record<AttendanceStatus, string> = {
   present: "Présent",
   absent_excused: "Absence excusée",
@@ -119,10 +168,15 @@ export const SESSION_LABELS_FR: Record<AttendanceSession, string> = {
   both: "Les deux",
 };
 
-/**
- * Pure grade computation — exposed for both UI and use-case layers.
- * Source: plan §06.02.
- */
+export const PROMOTION_DECISION_LABELS_FR: Record<PromotionDecision, string> = {
+  promoted: "Promu(e)",
+  repeated: "Redouble",
+  graduated: "Diplômé(e)",
+  transferred: "Transféré(e)",
+};
+
+export const DEFAULT_PASSING_GRADE = 10.0;
+
 export function computeSubjectAverage(
   devoir1: number | null,
   devoir2: number | null,
@@ -132,26 +186,46 @@ export function computeSubjectAverage(
   const d1 = devoir1 ?? 0;
   const d2 = devoir2 ?? 0;
   const ex = examen ?? 0;
-  return (d1 + d2 + 2 * ex) / 4;
+  return Number(((d1 + d2 + ex * 2) / 4).toFixed(2));
 }
 
 export function computeOverallGpa(
-  assessments: ReadonlyArray<{ subjectAverage: number | null; coefficient: number }>,
+  assessments: ReadonlyArray<{
+    subjectAverage: number | null;
+    coefficient: number;
+    isExtracurricular?: boolean;
+  }>,
 ): number | null {
   let weightedSum = 0;
-  let coefSum = 0;
+  let totalCoef = 0;
+
   for (const a of assessments) {
-    if (a.subjectAverage == null) continue;
+    if (a.subjectAverage == null || a.isExtracurricular) continue;
     weightedSum += a.subjectAverage * a.coefficient;
-    coefSum += a.coefficient;
+    totalCoef += a.coefficient;
   }
-  return coefSum === 0 ? null : weightedSum / coefSum;
+
+  if (totalCoef === 0) return null;
+  return Number((weightedSum / totalCoef).toFixed(2));
 }
 
-export function isPassing(gpa: number, passingGrade = 10.0): boolean {
+export function isPassing(
+  gpa: number,
+  passingGrade = DEFAULT_PASSING_GRADE,
+): boolean {
   return gpa >= passingGrade;
 }
 
 export function validateScore(value: number): boolean {
   return Number.isFinite(value) && value >= 0 && value <= 20;
+}
+
+export function calculateAttendanceRate(
+  records: readonly AttendanceRecord[],
+): number {
+  if (records.length === 0) return 1.0;
+  const presentCount = records.filter(
+    (r) => r.status === "present" || r.status === "late",
+  ).length;
+  return Number((presentCount / records.length).toFixed(2));
 }

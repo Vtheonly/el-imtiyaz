@@ -1,22 +1,6 @@
 /**
  * Mock repository implementations — in-memory, reactive (via SubjectBehavior),
  * seeded with the data from seed-data.ts.
- *
- * ---------------------------------------------------------------------------
- * REFACTOR NOTE (iteration 2):
- * The implementation has been split into per-entity / per-domain modules
- * under `./repositories/`. This file is now a thin barrel that:
- *   1. Re-exports all the singleton repository instances.
- *   2. Wires the workforce + operations audit sinks so they append to the
- *      same in-memory audit log used by the rest of the app.
- *
- * The shared `MockStore`, `appendAudit`, `delay`, and `nowIso` helpers live
- * in `./repositories/mock-store.ts`. Each repository file imports what it
- * needs from there.
- *
- * Backwards compatibility: all existing imports from
- * `@/infrastructure/mock/mock-repositories` continue to work unchanged.
- * ---------------------------------------------------------------------------
  */
 import { appendAudit } from "./repositories/mock-store";
 import { setWorkforceAuditSink } from "./workforce";
@@ -32,6 +16,7 @@ export {
   mockGradeRepository,
   mockAttendanceRepository,
   mockHomeworkRepository,
+  mockPromotionRepository,
 } from "./repositories/academic-repository";
 export {
   mockPaymentRepository,
@@ -59,7 +44,7 @@ export { mockAIConfigRepository } from "./repositories/ai-config-repository";
 export { mockBackupRepository } from "./repositories/backup-repository";
 export { mockCalendarRepository } from "./repositories/calendar-repository";
 
-// Re-export workforce singletons (kept in their own subdirectory).
+// Re-export workforce singletons
 export {
   mockDepartmentRepository,
   mockShiftRepository,
@@ -72,7 +57,7 @@ export {
   mockOnboardingRepository,
 } from "./workforce";
 
-// Re-export operations singletons (kept in their own subdirectory).
+// Re-export operations singletons
 export {
   mockSupplierRepository,
   mockPurchaseRequestRepository,
@@ -82,13 +67,8 @@ export {
 } from "./operations";
 
 // ---------------------------------------------------------------------------
-// Audit sink wiring — connects the workforce + operations audit emitters to
-// the main in-memory audit log. This MUST run at module load time so the
-// sinks are registered before any workforce/operations mutation occurs.
+// Audit sink wiring
 // ---------------------------------------------------------------------------
-
-// Iteration 8 — wire the workforce audit sink so workforce repositories can
-// append to the same in-memory audit log used by the rest of the app.
 setWorkforceAuditSink((input) => {
   appendAudit({
     action: input.action,
@@ -101,9 +81,6 @@ setWorkforceAuditSink((input) => {
   });
 });
 
-// Iteration 9 — wire the operations audit sink so the new operations
-// repositories (suppliers, purchase requests, deliveries, inventory) share
-// the same audit trail as the rest of the app.
 setOperationsAuditSink((input) => {
   appendAudit({
     action: input.action,
