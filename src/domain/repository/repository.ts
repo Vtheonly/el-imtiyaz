@@ -35,7 +35,9 @@ import type {
   CollectPaymentInput,
   UpdateInstallmentDueDateInput,
   AcademicCycle,
+  PaymentCategory,
 } from "../model/payment";
+import type { AllocationResult } from "../calc/payment/installments";
 import type {
   AppNotification,
   DashboardKpi,
@@ -164,6 +166,24 @@ export interface PaymentRepository {
   refund(id: string): Promise<Result<Payment>>;
   adjust(parentId: string, amount: number, reason: string, approvedBy: string): Promise<Result<AccountAdjustment>>;
   generateReceipt(paymentId: string, generatedBy: string): Promise<Result<Receipt>>;
+  /**
+   * Append an à-la-carte charge for an additional service (canteen, uniform,
+   * books, 2nd apron). Used by the UnifiedPaymentModal `single_item` mode and
+   * the parent drawer's "Sell service" action.
+   *
+   * UNIFIED ARCHITECTURE (Epic 4.3): ensures every billable service — not
+   * just tuition + transport — writes a `charge` entry to `ledger_entries`.
+   */
+  appendManualCharge(input: {
+    parentId: string;
+    studentId: string;
+    serviceQualifier:
+      | "canteen_term"
+      | "uniform"
+      | "books"
+      | "second_apron";
+    description?: string;
+  }, actorId: string): Promise<Result<LedgerEntry>>;
 }
 
 export interface InstallmentRepository {
@@ -171,6 +191,30 @@ export interface InstallmentRepository {
   observeByStudent(studentId: string): Observable<Installment[]>;
   observeById(id: string): Observable<Installment | null>;
   markPaid(id: string, paymentId: string): Promise<Result<Installment>>;
+  /**
+   * Waterfall Allocation Engine — distribute a payment across all
+   * eligible unpaid/partial installments for a parent (oldest first).
+   *
+   * Returns the per-installment breakdown plus any leftover amount
+   * (overpayment / parent credit). Guarantees Ledger ↔ Installment
+   * mathematical consistency.
+   *
+   * @param parentId        Parent whose installments should be satisfied.
+   * @param paymentAmount   Total amount being paid.
+   * @param paymentId       The Payment ID (for audit trail linkage).
+   * @param categoryFilter  Optional — restrict allocation to a single
+   *                        category (e.g. "tuition" or "transport").
+   * @param actorId         Audit actor ID.
+   * @param actorName       Audit actor display name.
+   */
+  allocatePayment(
+    parentId: string,
+    paymentAmount: number,
+    paymentId: string,
+    categoryFilter?: PaymentCategory,
+    actorId?: string,
+    actorName?: string,
+  ): Promise<Result<AllocationResult>>;
   /**
    * Iteration 9 — flexible installment schedules (plan §07.03 expansion).
    *

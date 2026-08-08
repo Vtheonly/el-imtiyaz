@@ -30,15 +30,28 @@ import { useAuth } from "../../app/providers/auth-provider";
 import { useObservable } from "../../shared/hooks/use-observable";
 import { UnifiedModal, type UnifiedModalProps } from "../../shared/ui/unified-modal";
 import { Button } from "../../shared/ui/button";
-import { LEVEL_LABELS_FR, type CreateStudentInput } from "../../domain/model/student";
-import type { CreateParentInput, CityTier } from "../../domain/model/parent";
-import { tuitionForLevel, transportForTier, tuitionTranches } from "../../domain/model/pricing";
+import {
+  LEVEL_LABELS_FR,
+  gradeLevelFromLevelYear,
+  type CreateStudentInput,
+} from "../../domain/model/student";
+import type { CreateParentInput, TransportDestination } from "../../domain/model/parent";
+import {
+  TRANSPORT_DESTINATION_LABELS_FR,
+} from "../../domain/model/parent";
+import {
+  tuitionForLevel,
+  tuitionTranchesForGrade,
+  transportForDestination,
+  transportTranchesForDestination,
+} from "../../domain/model/pricing";
 
 import { Step1 } from "./batch-registration/step1-parent";
 import { Step2 } from "./batch-registration/step2-students";
 import { Step3 } from "./batch-registration/step3-billing";
 import { Step4 } from "./batch-registration/step4-review";
 import { computeBilling } from "./batch-registration/compute-billing";
+import type { Billing } from "./batch-registration/types";
 import { EMPTY_PARENT, EMPTY_STUDENT, PHONE_RE, EMAIL_RE, type Step1Parent, type Step2Student } from "./batch-registration/types";
 
 export function BatchRegistrationModal({
@@ -104,31 +117,19 @@ export function BatchRegistrationModal({
   }
 
   // === Billing computation (step 3) ===
-  const billing = useMemo<ReturnType<typeof computeBilling>>(() => {
-    const registrationFee = includeRegistration ? pricing.registrationFee : 0;
-    let tuition = 0;
-    let transport = 0;
-    const perStudent = students.map((s, i) => {
-      const t = tuitionForLevel(pricing, s.level);
-      const tr = includeTransport && s.transportTier ? transportForTier(pricing, s.transportTier as CityTier) : 0;
-      tuition += t;
-      transport += tr;
-      return {
-        index: i + 1,
-        name: `${s.firstName} ${s.lastName}`.trim() || `Élève ${i + 1}`,
-        level: LEVEL_LABELS_FR[s.level],
-        tuition: t,
-        transport: tr,
-        tranches: tuitionTranches(t),
-      };
+  // Now delegates to the pure `computeBilling` helper which evaluates all 5
+  // official `Prices.md` discounts ONCE on the gross annual tuition, then
+  // splits the net across tranches (or 1 entry for `full_annual`). This
+  // eliminates the double-discounting bug documented in the architectural
+  // blueprint (discounts were previously applied per-tranche inside
+  // `buildTuitionChargeEntries`).
+  const billing = useMemo<Billing>(() => {
+    return computeBilling({
+      students,
+      pricing,
+      includeRegistration,
+      includeTransport,
     });
-    return {
-      perStudent,
-      registrationFee,
-      totalTuition: tuition,
-      totalTransport: transport,
-      grandTotal: registrationFee + tuition + transport,
-    };
   }, [students, pricing, includeRegistration, includeTransport]);
 
   // === Atomic submit ===
@@ -145,7 +146,7 @@ export function BatchRegistrationModal({
         email: parent.email.trim() || null,
         occupation: parent.occupation.trim() || null,
         address: parent.address.trim() || null,
-        cityTier: parent.cityTier || null,
+        transportDestination: (parent.transportDestination || null) as TransportDestination | null,
         preferredLanguage: parent.preferredLanguage,
       };
       const studentInputs: CreateStudentInput[] = students.map((s) => ({
@@ -156,7 +157,9 @@ export function BatchRegistrationModal({
         level: s.level,
         gradeYear: s.gradeYear,
         medicalNotes: s.medicalNotes.trim() || null,
-        transportTier: s.transportTier || null,
+        // Student.transportTier is a bare string — we store the canonical destination key in it.
+        transportTier: (s.transportDestination || null) as string | null,
+        paymentPlan: s.paymentPlan,
       }));
 
       const result = await repos.students.batchRegister({
@@ -279,7 +282,12 @@ export function BatchRegistrationModal({
       <div className="max-h-[50vh] overflow-y-auto">
         {step === 1 && <Step1 parent={parent} setParent={setParent} errors={errors} />}
         {step === 2 && (
-          <Step2 students={students} setStudents={setStudents} errors={errors} parentCityTier={parent.cityTier} />
+          <Step2
+            students={students}
+            setStudents={setStudents}
+            errors={errors}
+            parentTransportDestination={parent.transportDestination}
+          />
         )}
         {step === 3 && (
           <Step3

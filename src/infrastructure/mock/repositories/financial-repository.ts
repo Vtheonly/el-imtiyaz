@@ -36,8 +36,11 @@ import type {
   DebtSummary,
   AcademicCycle,
   UpdateInstallmentDueDateInput,
+  PaymentCategory,
 } from "../../../domain/model/payment";
+import type { AllocationResult } from "../../../domain/calc/payment/installments";
 import type { Expense, SubmitExpenseInput, ExpenseStatus } from "../../../domain/model/expense";
+import type { LedgerEntry } from "../../../domain/model/ledger";
 import {
   store, TENANT_ID, appendAudit, nowIso, delay,
 } from "./mock-store";
@@ -46,8 +49,14 @@ import {
   collectPayment, refundPayment, adjustAccount, generateReceiptForPayment,
 } from "./financial/payment-ops";
 import {
+  appendManualCharge,
+  type AppendManualChargeInput,
+  type AdditionalServiceQualifier,
+} from "./financial/charge-ops";
+import {
   markInstallmentPaid, updateInstallmentDueDate,
   regenerateInstallmentsForCycle, findOverdueInstallments,
+  allocatePaymentAcrossInstallments,
 } from "./financial/installment-ops";
 import {
   observeDebtSummary, observeParentFinancialProfile, sendDebtReminder,
@@ -95,6 +104,17 @@ export class MockPaymentRepository implements PaymentRepository {
   generateReceipt(paymentId: string, generatedBy: string): Promise<Result<Receipt>> {
     return generateReceiptForPayment(ctx, paymentId, generatedBy);
   }
+  /**
+   * Append an à-la-carte charge for an additional service (canteen, uniform,
+   * books, 2nd apron). Used by the UnifiedPaymentModal `single_item` mode and
+   * the parent drawer's "Sell service" action.
+   */
+  appendManualCharge(
+    input: AppendManualChargeInput,
+    actorId: string,
+  ): Promise<Result<LedgerEntry>> {
+    return appendManualCharge(ctx, input, actorId);
+  }
 }
 
 // ============================================================================
@@ -113,6 +133,24 @@ export class MockInstallmentRepository implements InstallmentRepository {
   }
   markPaid(id: string, paymentId: string): Promise<Result<Installment>> {
     return markInstallmentPaid(ctx, id, paymentId);
+  }
+  allocatePayment(
+    parentId: string,
+    paymentAmount: number,
+    paymentId: string,
+    categoryFilter?: PaymentCategory,
+    actorId?: string,
+    actorName?: string,
+  ): Promise<Result<AllocationResult>> {
+    return allocatePaymentAcrossInstallments(
+      ctx,
+      parentId,
+      paymentAmount,
+      paymentId,
+      categoryFilter,
+      actorId,
+      actorName,
+    );
   }
   updateDueDate(input: UpdateInstallmentDueDateInput): Promise<Result<Installment>> {
     return updateInstallmentDueDate(ctx, input);

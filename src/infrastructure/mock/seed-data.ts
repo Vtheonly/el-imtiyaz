@@ -360,6 +360,7 @@ export const seedStudents = [
   photoUrl: null,
   transportTier: s.level === "primaire" ? "t1" : null,
   status: "active" as const,
+  paymentPlan: "tranches" as const,
   createdAt: daysAgo(120),
   updatedAt: daysAgo(2),
 }));
@@ -708,6 +709,7 @@ export const seedInstallments = seedParents
         label: `Tranche ${t}`,
         amountDue,
         amountPaid: paid ? amountDue : t === 2 ? Math.round(amountDue / 2) : 0,
+        amountPending: 0,
         dueDate: iso(due),
         paidDate: paid ? iso(due) : null,
         status: paid
@@ -716,11 +718,70 @@ export const seedInstallments = seedParents
             ? ("partial" as const)
             : ("pending" as const),
         academicCycle: cycle,
+        paymentPlan: "tranches" as const,
+        isCustomSchedule: false,
         customSchedule: false,
         customScheduleNote: null,
       };
     });
   });
+
+// === Backing payments for seed installments with amountPaid > 0 ===
+//
+// The seed installments above mark some tranches as `paid` with
+// `amountPaid > 0`, but `seedPayments` doesn't necessarily include
+// matching payment records for every paid installment. This creates
+// UNBACKED_TRANCHE_SATISFACTION reconciliation errors.
+//
+// This step generates synthetic `seedPayments` entries to back every paid
+// installment account that doesn't already have enough cleared payments,
+// ensuring the seed data is internally consistent. The synthetic payments
+// use deterministic IDs (pay-seed-back-NNN) so they're easy to identify.
+{
+  const existingClearedByAccount = new Map<string, number>();
+  for (const p of seedPayments) {
+    if (p.status !== "paid") continue;
+    const key = `${p.parentId}|${p.category}|${p.studentId ?? ""}`;
+    existingClearedByAccount.set(key, (existingClearedByAccount.get(key) ?? 0) + p.amount);
+  }
+
+  const amountPaidByAccount = new Map<string, number>();
+  for (const inst of seedInstallments) {
+    if (inst.amountPaid <= 0) continue;
+    const key = `${inst.parentId}|${inst.category}|${inst.studentId ?? ""}`;
+    amountPaidByAccount.set(key, (amountPaidByAccount.get(key) ?? 0) + inst.amountPaid);
+  }
+
+  let backingSeq = 0;
+  for (const [key, totalAmountPaid] of amountPaidByAccount) {
+    const existing = existingClearedByAccount.get(key) ?? 0;
+    const shortfall = totalAmountPaid - existing;
+    if (shortfall > 0.5) {
+      backingSeq++;
+      const [parentId, category, studentIdStr] = key.split("|");
+      const studentId = studentIdStr || null;
+      const d = new Date(NOW.getTime() - 45 * 86_400_000);
+      seedPayments.push({
+        id: `pay-seed-back-${String(backingSeq).padStart(3, "0")}`,
+        tenantId: TENANT_ID,
+        receiptNumber: `REC-SEED-BACK-${String(backingSeq).padStart(3, "0")}`,
+        parentId,
+        studentId,
+        amount: shortfall,
+        method: "cash" as const,
+        status: "paid" as const,
+        category: category as "tuition" | "transport",
+        installmentId: null,
+        proofUrl: null,
+        notes: "Backing payment for seed installment(s)",
+        collectedBy: "usr-fin-001",
+        collectedAt: iso(d),
+        createdAt: iso(d),
+        updatedAt: iso(d),
+      });
+    }
+  }
+}
 
 export const seedExpenses = [
   {
